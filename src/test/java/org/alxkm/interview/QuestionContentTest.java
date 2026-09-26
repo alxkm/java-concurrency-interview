@@ -93,11 +93,9 @@ class QuestionContentTest {
     void readmeIsUpToDate() throws IOException {
         Path readme = Quiz.questionsDir().getParent().resolve("README.md");
         String content = Files.readString(readme, StandardCharsets.UTF_8);
-        String expected = Quiz.catalogue(BANK);
-        int begin = content.indexOf("<!-- BEGIN QUESTIONS -->");
-        int end = content.indexOf("<!-- END QUESTIONS -->");
-        assertTrue(begin >= 0 && end > begin, "README.md has lost its generated section markers");
-        assertEquals(expected, content.substring(begin, end + "<!-- END QUESTIONS -->".length()),
+        // render() covers the screen, the catalogue and the question count, and throws if a marker
+        // has gone missing.
+        assertEquals(Quiz.render(content, BANK), content,
                 "README.md is out of date. Run ./gradlew readme");
     }
 }

@@ -1,0 +1,31 @@
+name: links
+
+# Most answers link to runnable examples in java-concurrency-patterns. If that repository moves a
+# file, the link here breaks silently, so check them on every change and once a week regardless.
+on:
+  push:
+    branches: [ "master" ]
+    paths: [ "**.md" ]
+  pull_request:
+    branches: [ "master" ]
+    paths: [ "**.md" ]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress --max-retries 3 './**/*.md'
+          fail: true
+          token: ${{ secrets.GITHUB_TOKEN }}
