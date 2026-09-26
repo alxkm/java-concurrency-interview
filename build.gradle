@@ -1,0 +1,77 @@
+plugins {
+    id 'java'
+}
+
+group = 'org.alxkm'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:6.1.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter-api'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// The quiz is one dependency-free file, so Gradle is a convenience here rather than a requirement:
+//
+//     ./gradlew quiz            # this task
+//     java src/main/java/org/alxkm/interview/Quiz.java   # same thing, no build
+//
+// --console=plain matters. Without it Gradle repaints its progress bar over the questions.
+tasks.register('quiz', JavaExec) {
+    group = 'application'
+    description = 'Runs the interactive quiz. Use: ./gradlew quiz --console=plain -q'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.alxkm.interview.Quiz'
+    workingDir = projectDir
+    standardInput = System.in
+    args = (project.findProperty('args') ?: '').toString().split(' ').findAll { it }
+}
+
+// The README's question catalogue is generated from questions/*.md, so the quiz and the README can
+// never drift apart. Everything outside the BEGIN/END markers is hand-written and left alone.
+tasks.register('readme', JavaExec) {
+    group = 'documentation'
+    description = 'Regenerates the question catalogue inside README.md from questions/*.md'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.alxkm.interview.Quiz'
+    workingDir = projectDir
+    args = ['--export-readme']
+}
+
+tasks.register('stats', JavaExec) {
+    group = 'documentation'
+    description = 'Prints how many questions there are, by topic and by level.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.alxkm.interview.Quiz'
+    workingDir = projectDir
+    args = ['--stats']
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+    }
+
+    // The tests read questions/ and README.md from disk rather than from the classpath, so Gradle
+    // cannot see that a new question invalidates them. Without these, editing a question and running
+    // ./gradlew test reports success from a cached run that never looked at the new file.
+    inputs.dir('questions')
+            .withPropertyName('questions')
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file('README.md')
+            .withPropertyName('readme')
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+}

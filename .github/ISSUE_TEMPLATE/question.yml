@@ -1,0 +1,54 @@
+name: Suggest a question
+description: A question you were asked, or ask, in a Java concurrency interview
+title: "[question] "
+labels: ["question-suggestion"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: The question
+      description: Worded the way an interviewer actually asks it.
+      placeholder: Why does a thread waiting on a ReentrantLock not show as BLOCKED in a thread dump?
+    validations:
+      required: true
+
+  - type: textarea
+    id: answer
+    attributes:
+      label: The answer, or the gist of it
+      description: The mechanism, not the keyword. A rough draft is fine, we can work on the wording.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      options:
+        - Threads and lifecycle
+        - The Java memory model
+        - synchronized, monitors, wait and notify
+        - Locks, conditions and AQS
+        - "Synchronizers: latches, barriers, semaphores"
+        - Atomics and compare-and-swap
+        - Concurrent collections
+        - Executors and thread pools
+        - CompletableFuture and async composition
+        - Fork/join and parallel streams
+        - Virtual threads and structured concurrency
+        - Concurrency in real systems
+        - Deadlock, livelock and diagnostics
+        - Patterns and antipatterns
+        - Testing concurrent code
+        - Live coding puzzles
+        - A topic that does not exist yet
+    validations:
+      required: true
+
+  - type: dropdown
+    id: level
+    attributes:
+      label: Level
+      options: [junior, mid, senior]
+    validations:
+      required: true

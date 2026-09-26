@@ -1,0 +1,21 @@
+# Build output
+build/
+.gradle/
+out/
+bin/
+*.class
+
+# Local quiz progress, written by the quiz itself
+.progress
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
+Thumbs.db
