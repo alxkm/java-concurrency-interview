@@ -45,8 +45,18 @@ It is also a quiz you can run. One file, no dependencies, ASCII only.
 
 ## Run it
 
-Java 21 or newer, and nothing else. There is no dependency to download, so the fastest way needs no
-build at all:
+Java 21 or newer, and nothing else. With [JBang](https://www.jbang.dev), not even a clone:
+
+```bash
+jbang quiz@alxkm/java-concurrency-interview
+```
+
+Or download `java-concurrency-interview.jar` from the
+[latest release](https://github.com/alxkm/java-concurrency-interview/releases/latest) and run
+`java -jar java-concurrency-interview.jar`. Both carry the questions inside the jar and keep your
+progress in `~/.java-concurrency-interview.progress`.
+
+From a clone there is no dependency to download either, so the quiz needs no build at all:
 
 ```bash
 git clone https://github.com/alxkm/java-concurrency-interview.git
