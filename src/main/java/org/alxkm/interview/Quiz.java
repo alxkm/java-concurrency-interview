@@ -9,11 +9,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -875,6 +877,23 @@ public final class Quiz {
 
         private enum Verdict { CORRECT, WRONG, SKIPPED, QUIT }
 
+        /**
+         * Whether the letters typed pick exactly the correct options. {@code order} maps the letter's
+         * position on screen to the option's position in the file, since options are shuffled.
+         *
+         * <p>The letters are a set: "aa" on a question whose answer is "ab" picks one option, not two.
+         */
+        static boolean marks(Question question, List<Integer> order, String input) {
+            Set<Integer> chosen = new HashSet<>();
+            for (char c : input.toCharArray()) {
+                int index = c - 'a';
+                if (index >= 0 && index < order.size()) {
+                    chosen.add(order.get(index));
+                }
+            }
+            return chosen.equals(new HashSet<>(question.correctIndexes()));
+        }
+
         private Verdict ask(Question question, int number, int total, int score) {
             List<Integer> order = new ArrayList<>();
             for (int i = 0; i < question.options().size(); i++) {
@@ -910,16 +929,7 @@ public final class Quiz {
                 ui.blank();
                 ui.line("  " + ui.yellow("skipped"));
             } else {
-                List<Integer> chosen = new ArrayList<>();
-                for (char c : input.toCharArray()) {
-                    int index = c - 'a';
-                    if (index >= 0 && index < order.size()) {
-                        chosen.add(order.get(index));
-                    }
-                }
-                correct = !chosen.isEmpty()
-                        && chosen.size() == question.correctIndexes().size()
-                        && question.correctIndexes().containsAll(chosen);
+                correct = marks(question, order, input);
                 ui.blank();
                 ui.line(correct ? "  " + ui.green("correct") : "  " + ui.red("not quite"));
             }

@@ -46,6 +46,9 @@ Rules the parser and the tests enforce:
 - The explanation is longer than a sentence. If it is not, the question is not pulling its weight.
 - The correct option is not conspicuously longer than the wrong ones. That is the oldest tell in
   multiple choice, and there is a test for it.
+- Every ` ```java ` block is checked. One made only of whole classes must compile (the
+  `java.util.concurrent` imports are supplied); a fragment must at least parse. Write `...` for
+  elided code, and use a plain ` ``` ` fence for anything that is deliberately not valid Java.
 
 Several correct options are allowed. The quiz notices and asks for all of them.
 
