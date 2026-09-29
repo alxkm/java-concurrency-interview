@@ -97,7 +97,9 @@ Two correct endings. Propagate it, if your signature allows, and let the caller 
 cannot, restore the flag before returning:
 
 ```java
-catch (InterruptedException e) {
+try {
+    task = queue.take();
+} catch (InterruptedException e) {
     Thread.currentThread().interrupt();   // the next blocking call will see it
     return;                               // and stop doing work
 }

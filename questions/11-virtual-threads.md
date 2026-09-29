@@ -277,3 +277,28 @@ try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
 This is structured concurrency's shape without its error propagation: a failure in one task does not
 cancel the others, and you still collect outcomes from the futures yourself. It is the pragmatic
 halfway house available today in stable API.
+
+## Is a virtual thread faster than a platform thread?
+- id: virtual-thread-not-faster
+- level: junior
+- tags: virtual-threads, throughput
+
+* [ ] Yes, the same code runs several times faster on it
+* [x] No: code runs at the same speed, but blocking is cheap, so you can afford far more threads
+* [ ] Yes, but only for CPU-heavy work
+* [ ] No, it is slower because its code is interpreted
+
+A virtual thread runs ordinary bytecode on an ordinary platform thread, its carrier. Nothing about
+the code itself gets faster, and one request takes as long as it did before.
+
+What changes is the price of waiting. A platform thread is an OS thread with a stack reserved up
+front, so a server can afford a few thousand of them. A virtual thread is a small heap object; when it
+blocks on I/O or a lock it unmounts and frees the carrier for another one. A million of them waiting
+on sockets is fine.
+
+So the win is **throughput for I/O-bound work**: with many requests each spending most of their time
+waiting, you can have one thread per request instead of a pool that runs out. For CPU-bound work
+there is no win at all: the carriers are as many as the cores, and the cores were already busy.
+
+A good answer ends with the caveat: more concurrent requests means more pressure on whatever they
+wait for. The database pool is still ten connections, so bound it with a `Semaphore`.

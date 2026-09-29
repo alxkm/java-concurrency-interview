@@ -255,3 +255,30 @@ A checklist that finds real bugs:
 - Do the tests bound their waits, and is the thread safety policy written in the javadoc?
 
 Offering this list unprompted is usually a stronger signal than any single technical answer.
+
+## What is the difference between `assertTimeout` and `assertTimeoutPreemptively` in JUnit 5?
+- id: junit-timeouts
+- level: junior
+- tags: junit, timeouts, deadlock
+
+* [ ] None, one is an alias for the other
+* [ ] `assertTimeout` interrupts the code when the deadline passes
+* [x] `assertTimeout` waits for the code and fails if it was slow; the other gives up at the deadline
+* [ ] `assertTimeoutPreemptively` retries the code until it passes
+
+`assertTimeout` runs the code on the test's own thread, lets it finish, and only then compares the
+time taken with the limit. That is fine for "this should be fast", and useless for "this might
+deadlock": a deadlocked call never returns, so the assertion never runs and the build hangs until
+CI kills it, with no message.
+
+`assertTimeoutPreemptively` runs the code on a separate thread and stops waiting at the deadline, so
+the test fails on time and says why. Two costs come with the other thread:
+
+- The stuck thread is interrupted, and a thread blocked on `synchronized` ignores that, so it stays
+  behind for the rest of the run. Harmless for one failing test, worth knowing when many fail.
+- Anything bound to the test thread through a `ThreadLocal` is missing there. Spring's test-managed
+  transaction and security context are the usual surprises.
+
+The annotation form is `@Timeout`, with `threadMode = SEPARATE_THREAD` for the preemptive behaviour,
+and `junit.jupiter.execution.timeout.default` sets a limit for every test, which is a cheap safety
+net for a concurrency-heavy suite.

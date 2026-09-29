@@ -4,16 +4,23 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystemAlreadyExistsException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -366,6 +373,9 @@ public final class Quiz {
      *
      * <p>Gradle sets the working directory to the project; a bare {@code java Quiz.java} inherits the
      * shell's. Walking up a few levels covers both, and {@code -Dquestions=...} covers the rest.
+     *
+     * <p>The released jar carries its own copy, which is how {@code java -jar} and JBang run the quiz
+     * with no clone at all. A checkout still wins, so an edited question shows up straight away.
      */
     static Path questionsDir() {
         String override = System.getProperty("questions");
@@ -380,8 +390,38 @@ public final class Quiz {
             }
             candidate = candidate.getParent();
         }
+        URL bundled = Quiz.class.getResource("/questions");
+        if (bundled != null) {
+            return bundled(bundled);
+        }
         throw new IllegalStateException("cannot find the questions/ directory. Run from the repository "
                 + "root, or pass -Dquestions=/path/to/questions");
+    }
+
+    private static Path bundled(URL url) {
+        try {
+            URI uri = url.toURI();
+            if (uri.getScheme().equals("jar")) {
+                try {
+                    FileSystems.newFileSystem(uri, Map.of());
+                } catch (FileSystemAlreadyExistsException alreadyOpen) {
+                    // opened by an earlier call; Path.of finds it
+                }
+            }
+            return Path.of(uri);
+        } catch (URISyntaxException | IOException e) {
+            throw new IllegalStateException("cannot read the questions bundled in " + url, e);
+        }
+    }
+
+    /**
+     * Next to the questions in a checkout, as before. Inside a jar there is nowhere to write, so the
+     * file goes in the home directory instead.
+     */
+    static Path progressFile(Path questions) {
+        return questions.getFileSystem() == FileSystems.getDefault()
+                ? questions.toAbsolutePath().getParent().resolve(PROGRESS_FILE)
+                : Path.of(System.getProperty("user.home"), ".java-concurrency-interview" + PROGRESS_FILE);
     }
 
     // -------------------------------------------------------------- progress
@@ -424,6 +464,10 @@ public final class Quiz {
 
         boolean seen(String id) {
             return counts.containsKey(id);
+        }
+
+        Path file() {
+            return file;
         }
 
         void save() {
@@ -728,7 +772,7 @@ public final class Quiz {
                     case "7" -> progressScreen();
                     case "8" -> cycleFilter();
                     case "q", "quit", "exit" -> {
-                        ui.line("  " + ui.dim("progress saved to " + PROGRESS_FILE + ". Good luck."));
+                        ui.line("  " + ui.dim("progress saved to " + progress.file() + ". Good luck."));
                         ui.blank();
                         return;
                     }
@@ -875,6 +919,23 @@ public final class Quiz {
 
         private enum Verdict { CORRECT, WRONG, SKIPPED, QUIT }
 
+        /**
+         * Whether the letters typed pick exactly the correct options. {@code order} maps the letter's
+         * position on screen to the option's position in the file, since options are shuffled.
+         *
+         * <p>The letters are a set: "aa" on a question whose answer is "ab" picks one option, not two.
+         */
+        static boolean marks(Question question, List<Integer> order, String input) {
+            Set<Integer> chosen = new HashSet<>();
+            for (char c : input.toCharArray()) {
+                int index = c - 'a';
+                if (index >= 0 && index < order.size()) {
+                    chosen.add(order.get(index));
+                }
+            }
+            return chosen.equals(new HashSet<>(question.correctIndexes()));
+        }
+
         private Verdict ask(Question question, int number, int total, int score) {
             List<Integer> order = new ArrayList<>();
             for (int i = 0; i < question.options().size(); i++) {
@@ -910,16 +971,7 @@ public final class Quiz {
                 ui.blank();
                 ui.line("  " + ui.yellow("skipped"));
             } else {
-                List<Integer> chosen = new ArrayList<>();
-                for (char c : input.toCharArray()) {
-                    int index = c - 'a';
-                    if (index >= 0 && index < order.size()) {
-                        chosen.add(order.get(index));
-                    }
-                }
-                correct = !chosen.isEmpty()
-                        && chosen.size() == question.correctIndexes().size()
-                        && question.correctIndexes().containsAll(chosen);
+                correct = marks(question, order, input);
                 ui.blank();
                 ui.line(correct ? "  " + ui.green("correct") : "  " + ui.red("not quite"));
             }
@@ -1223,7 +1275,7 @@ public final class Quiz {
         }
 
         boolean color = !flags.contains("--no-color") && System.getenv("NO_COLOR") == null;
-        Progress progress = new Progress(questionsDir().getParent().resolve(PROGRESS_FILE));
+        Progress progress = new Progress(progressFile(questionsDir()));
         new Session(bank, new Ui(color), progress, !flags.contains("--no-shuffle")).menu();
     }
 }

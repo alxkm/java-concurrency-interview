@@ -29,6 +29,18 @@ dependencies {
 //     java src/main/java/org/alxkm/interview/Quiz.java   # same thing, no build
 //
 // --console=plain matters. Without it Gradle repaints its progress bar over the questions.
+// A runnable jar that carries the questions with it, for `java -jar` and JBang. The release workflow
+// attaches it to each GitHub release under this exact name, which the JBang catalog points at.
+tasks.named('jar') {
+    archiveFileName = 'java-concurrency-interview.jar'
+    manifest {
+        attributes 'Main-Class': 'org.alxkm.interview.Quiz'
+    }
+    from('questions') {
+        into 'questions'
+    }
+}
+
 tasks.register('quiz', JavaExec) {
     group = 'application'
     description = 'Runs the interactive quiz. Use: ./gradlew quiz --console=plain -q'
