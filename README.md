@@ -10,16 +10,21 @@ loud: the mechanism, the trade-off, and the follow-up the interviewer asks next.
 
 It is also a quiz you can run. One file, no dependencies, ASCII only.
 
+<!-- BEGIN SCREEN -->
 ```
   +----------------------------------------------------------------------------------------+
-  |   J A V A   C O N C U R R E N C Y   I N T E R V I E W                                   |
-  |                                                                                         |
-  |   writer   |--- write x=1 ---[ release ]-------------------->                           |
-  |                                    \  happens-before                                    |
-  |   reader   -----------------[ acquire ]--- reads x == 1 ---->                           |
-  |                                                                                         |
-  |   166 questions across 16 topics, each answered with the reasoning,                     |
-  |   not just the keyword an interviewer is listening for                                  |
+  |                                                                                        |
+  |   J A V A   C O N C U R R E N C Y   I N T E R V I E W                                  |
+  |                                                                                        |
+  |   writer   --- write x = 1 --->[ release ]                                             |
+  |                                     |                                                  |
+  |                                     |  happens-before                                  |
+  |                                     v                                                  |
+  |   reader   ------------------->[ acquire ]--- reads x == 1 --->                        |
+  |                                                                                        |
+  |   166 questions across 16 topics, each answered with the reasoning,                    |
+  |   not just the keyword an interviewer is listening for                                 |
+  |                                                                                        |
   +----------------------------------------------------------------------------------------+
 
   main menu
@@ -36,6 +41,7 @@ It is also a quiz you can run. One file, no dependencies, ASCII only.
 
   choose >
 ```
+<!-- END SCREEN -->
 
 ## Run it
 

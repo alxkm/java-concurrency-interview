@@ -3,12 +3,23 @@ name: build
 on:
   push:
     branches: [ "master" ]
+  # Every base branch, so a pull request stacked on another one is checked too, and "edited" so
+  # it is checked again when it is retargeted to master after the one below it merges.
   pull_request:
-    branches: [ "master" ]
+    types: [ opened, synchronize, reopened, edited ]
+
+permissions:
+  contents: read
+
+# A new push to a pull request makes the run for the previous push pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:

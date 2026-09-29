@@ -93,11 +93,22 @@ class QuestionContentTest {
     void readmeIsUpToDate() throws IOException {
         Path readme = Quiz.questionsDir().getParent().resolve("README.md");
         String content = Files.readString(readme, StandardCharsets.UTF_8);
-        String expected = Quiz.catalogue(BANK);
-        int begin = content.indexOf("<!-- BEGIN QUESTIONS -->");
-        int end = content.indexOf("<!-- END QUESTIONS -->");
-        assertTrue(begin >= 0 && end > begin, "README.md has lost its generated section markers");
-        assertEquals(expected, content.substring(begin, end + "<!-- END QUESTIONS -->".length()),
+        // render() covers the screen, the catalogue and the question count, and throws if a marker
+        // has gone missing.
+        assertEquals(Quiz.render(content, BANK), content,
                 "README.md is out of date. Run ./gradlew readme");
+    }
+
+    @Test
+    @DisplayName("a README checked out with CRLF line endings still counts as up to date")
+    void readmeCheckIgnoresLineEndings() throws IOException {
+        // Git for Windows defaults to core.autocrlf=true, so a fresh clone there has CRLF everywhere.
+        // CI runs on Linux and never sees that, which is how this once broke every Windows clone
+        // while the badge stayed green. Both spellings of the same README must pass.
+        Path readme = Quiz.questionsDir().getParent().resolve("README.md");
+        String lf = Files.readString(readme, StandardCharsets.UTF_8).replace("\r\n", "\n");
+        String crlf = lf.replace("\n", "\r\n");
+        assertEquals(lf, Quiz.render(lf, BANK), "LF checkout reported as out of date");
+        assertEquals(crlf, Quiz.render(crlf, BANK), "CRLF checkout reported as out of date");
     }
 }

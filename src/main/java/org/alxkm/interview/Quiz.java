@@ -41,6 +41,57 @@ public final class Quiz {
     private Quiz() {
     }
 
+    // ------------------------------------------------------------- screens
+    //
+    // Plain strings rather than Ui calls, because the README shows the same screen and generates it
+    // from here. A hand-copied screenshot drifts by a column the first time anyone edits it.
+
+    private static final String MENU_PROMPT = "choose >";
+
+    /** A box whose sides line up regardless of what is in it. */
+    static List<String> boxLines(List<String> lines) {
+        int inner = WIDTH - 6;
+        List<String> out = new ArrayList<>();
+        out.add("  +" + "-".repeat(inner + 2) + "+");
+        for (String line : lines) {
+            String clipped = line.length() > inner ? line.substring(0, inner) : line;
+            out.add("  | " + clipped + " ".repeat(inner - clipped.length()) + " |");
+        }
+        out.add("  +" + "-".repeat(inner + 2) + "+");
+        return out;
+    }
+
+    /** The release and the acquire share a column, so the edge between them reads as one arrow. */
+    static List<String> bannerLines(int questions, int topics) {
+        return List.of(
+                "",
+                "  J A V A   C O N C U R R E N C Y   I N T E R V I E W",
+                "",
+                "  writer   --- write x = 1 --->[ release ]",
+                "                                    |",
+                "                                    |  happens-before",
+                "                                    v",
+                "  reader   ------------------->[ acquire ]--- reads x == 1 --->",
+                "",
+                "  " + questions + " questions across " + topics + " topics, each answered with the"
+                        + " reasoning,",
+                "  not just the keyword an interviewer is listening for",
+                "");
+    }
+
+    static List<String> menuLines(String filter) {
+        return List.of(
+                "    [1] quiz one topic",
+                "    [2] mock interview       12 mixed questions, hardest topics first",
+                "    [3] random ten",
+                "    [4] flashcards           no options, recall it yourself",
+                "    [5] read a topic         questions and answers, no marking",
+                "    [6] review my misses     the ones you got wrong before",
+                "    [7] progress",
+                "    [8] level filter         currently: " + filter,
+                "    [q] quit");
+    }
+
     // ---------------------------------------------------------------- model
 
     /** Difficulty as an interviewer would pitch it, not a judgement about the reader. */
@@ -472,15 +523,8 @@ public final class Quiz {
             return paint(CYAN, text);
         }
 
-        /** A box whose sides line up regardless of what is in it. */
         void box(List<String> lines) {
-            int inner = WIDTH - 6;
-            System.out.println("  +" + "-".repeat(inner + 2) + "+");
-            for (String line : lines) {
-                String clipped = line.length() > inner ? line.substring(0, inner) : line;
-                System.out.println("  | " + clipped + " ".repeat(inner - clipped.length()) + " |");
-            }
-            System.out.println("  +" + "-".repeat(inner + 2) + "+");
+            boxLines(lines).forEach(System.out::println);
         }
 
         /** The header every screen starts with: where you are on the left, how far along on the right. */
@@ -500,16 +544,7 @@ public final class Quiz {
 
         void banner(int questions, int topics) {
             blank();
-            box(List.of(
-                    "  J A V A   C O N C U R R E N C Y   I N T E R V I E W",
-                    "",
-                    "  writer   |--- write x=1 ---[ release ]-------------------->",
-                    "                                    \\  happens-before",
-                    "  reader   -----------------[ acquire ]--- reads x == 1 ---->",
-                    "",
-                    "  " + questions + " questions across " + topics + " topics, each answered with the"
-                            + " reasoning,",
-                    "  not just the keyword an interviewer is listening for"));
+            box(bannerLines(questions, topics));
             blank();
         }
 
@@ -679,18 +714,9 @@ public final class Quiz {
             while (true) {
                 ui.line("  " + ui.bold("main menu"));
                 ui.blank();
-                ui.line("    [1] quiz one topic");
-                ui.line("    [2] mock interview       12 mixed questions, hardest topics first");
-                ui.line("    [3] random ten");
-                ui.line("    [4] flashcards           no options, recall it yourself");
-                ui.line("    [5] read a topic         questions and answers, no marking");
-                ui.line("    [6] review my misses     the ones you got wrong before");
-                ui.line("    [7] progress");
-                ui.line("    [8] level filter         currently: "
-                        + (filter == null ? "all" : filter.label()));
-                ui.line("    [q] quit");
+                menuLines(filter == null ? "all" : filter.label()).forEach(ui::line);
                 ui.blank();
-                String choice = ui.ask("choose >").toLowerCase(Locale.ROOT);
+                String choice = ui.ask(MENU_PROMPT).toLowerCase(Locale.ROOT);
                 ui.blank();
                 switch (choice) {
                     case "1" -> quizTopic();
@@ -1095,22 +1121,60 @@ public final class Quiz {
         return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
+    private static final String BEGIN_SCREEN = "<!-- BEGIN SCREEN -->";
+    private static final String END_SCREEN = "<!-- END SCREEN -->";
+
+    /** The main menu as a first-time reader sees it, for the top of the README. */
+    static String screen(Bank bank) {
+        List<String> lines = new ArrayList<>(boxLines(bannerLines(bank.questions().size(),
+                bank.topics().size())));
+        lines.add("");
+        lines.add("  main menu");
+        lines.add("");
+        lines.addAll(menuLines("all"));
+        lines.add("");
+        lines.add("  " + MENU_PROMPT);
+        return BEGIN_SCREEN + "\n```\n" + String.join("\n", lines) + "\n```\n" + END_SCREEN;
+    }
+
+    /**
+     * README.md with every generated part brought up to date: the screen, the catalogue, and the
+     * question count in the badge and the first sentence. The count sits in a line of badges, where a
+     * marker comment would break the paragraph, so it is matched by pattern instead.
+     */
+    static String render(String readme, Bank bank) {
+        // Git for Windows checks text out with CRLF by default, and everything generated here is
+        // built with LF. Work in LF and hand the file back in the line endings it arrived with, or a
+        // fresh Windows clone reports the README as out of date before anyone has touched it.
+        String eol = readme.contains("\r\n") ? "\r\n" : "\n";
+        String body = replaceBetween(readme.replace("\r\n", "\n"), BEGIN_SCREEN, END_SCREEN,
+                screen(bank));
+        body = replaceBetween(body, BEGIN, END, catalogue(bank));
+        int count = bank.questions().size();
+        body = body
+                .replaceAll("badge/questions-\\d+-", "badge/questions-" + count + "-")
+                .replaceAll("(?m)^\\d+ interview questions on Java concurrency",
+                        count + " interview questions on Java concurrency");
+        return eol.equals("\n") ? body : body.replace("\n", eol);
+    }
+
+    private static String replaceBetween(String text, String begin, String end, String generated) {
+        int from = text.indexOf(begin);
+        int to = text.indexOf(end);
+        if (from < 0 || to < from) {
+            throw new IllegalStateException("README.md is missing the " + begin + " / " + end
+                    + " markers");
+        }
+        return text.substring(0, from) + generated + text.substring(to + end.length());
+    }
+
     static void exportReadme(Bank bank) {
         Path readme = questionsDir().getParent().resolve("README.md");
-        String generated = catalogue(bank);
-        String body;
         try {
             String existing = Files.isRegularFile(readme)
                     ? Files.readString(readme, StandardCharsets.UTF_8)
                     : "";
-            int begin = existing.indexOf(BEGIN);
-            int end = existing.indexOf(END);
-            if (begin < 0 || end < 0) {
-                throw new IllegalStateException(
-                        "README.md is missing the " + BEGIN + " / " + END + " markers");
-            }
-            body = existing.substring(0, begin) + generated + existing.substring(end + END.length());
-            Files.writeString(readme, body, StandardCharsets.UTF_8);
+            Files.writeString(readme, render(existing, bank), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UncheckedIOException("cannot write " + readme, e);
         }

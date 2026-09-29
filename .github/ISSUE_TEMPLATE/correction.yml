@@ -1,0 +1,35 @@
+name: Correct an answer
+description: An answer is wrong, outdated for a newer JDK, or misleading
+title: "[correction] "
+labels: ["correction"]
+body:
+  - type: input
+    id: question
+    attributes:
+      label: Which question
+      description: The question id, or its number in the README.
+      placeholder: volatile-guarantees, or 23
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong
+      description: What the answer says, and what is actually true.
+    validations:
+      required: true
+
+  - type: textarea
+    id: source
+    attributes:
+      label: What settles it
+      description: A link to the JDK source, a JEP, the javadoc or the JLS is worth more than an argument.
+    validations:
+      required: true
+
+  - type: input
+    id: jdk
+    attributes:
+      label: JDK version, if it depends on one
+      placeholder: "changed in JDK 24 (JEP 491)"
