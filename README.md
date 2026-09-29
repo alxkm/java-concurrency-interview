@@ -3,9 +3,9 @@
 [![build](https://github.com/alxkm/java-concurrency-interview/actions/workflows/ci.yml/badge.svg)](https://github.com/alxkm/java-concurrency-interview/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java](https://img.shields.io/badge/Java-21%2B-orange.svg)](https://openjdk.org/projects/jdk/21/)
-[![questions](https://img.shields.io/badge/questions-166-blue.svg)](#contents)
+[![questions](https://img.shields.io/badge/questions-173-blue.svg)](#contents)
 
-166 interview questions on Java concurrency, each answered the way you would have to answer it out
+173 interview questions on Java concurrency, each answered the way you would have to answer it out
 loud: the mechanism, the trade-off, and the follow-up the interviewer asks next.
 
 It is also a quiz you can run. One file, no dependencies, ASCII only.
@@ -22,7 +22,7 @@ It is also a quiz you can run. One file, no dependencies, ASCII only.
   |                                     v                                                  |
   |   reader   ------------------->[ acquire ]--- reads x == 1 --->                        |
   |                                                                                        |
-  |   166 questions across 16 topics, each answered with the reasoning,                    |
+  |   173 questions across 16 topics, each answered with the reasoning,                    |
   |   not just the keyword an interviewer is listening for                                 |
   |                                                                                        |
   +----------------------------------------------------------------------------------------+
@@ -45,8 +45,18 @@ It is also a quiz you can run. One file, no dependencies, ASCII only.
 
 ## Run it
 
-Java 21 or newer, and nothing else. There is no dependency to download, so the fastest way needs no
-build at all:
+Java 21 or newer, and nothing else. With [JBang](https://www.jbang.dev), not even a clone:
+
+```bash
+jbang quiz@alxkm/java-concurrency-interview
+```
+
+Or download `java-concurrency-interview.jar` from the
+[latest release](https://github.com/alxkm/java-concurrency-interview/releases/latest) and run
+`java -jar java-concurrency-interview.jar`. Both carry the questions inside the jar and keep your
+progress in `~/.java-concurrency-interview.progress`.
+
+From a clone there is no dependency to download either, so the quiz needs no build at all:
 
 ```bash
 git clone https://github.com/alxkm/java-concurrency-interview.git
@@ -134,15 +144,15 @@ and an interview asks for the first one.
 | 4 | [Locks, conditions and AQS](#locks-conditions-and-aqs) | 10 | 1 / 4 / 5 |
 | 5 | [Synchronizers: latches, barriers, semaphores](#synchronizers-latches-barriers-semaphores) | 10 | 1 / 5 / 4 |
 | 6 | [Atomics and compare-and-swap](#atomics-and-compare-and-swap) | 10 | 1 / 3 / 6 |
-| 7 | [Concurrent collections](#concurrent-collections) | 11 | 1 / 7 / 3 |
+| 7 | [Concurrent collections](#concurrent-collections) | 12 | 2 / 7 / 3 |
 | 8 | [Executors and thread pools](#executors-and-thread-pools) | 12 | 1 / 6 / 5 |
 | 9 | [CompletableFuture and async composition](#completablefuture-and-async-composition) | 10 | 2 / 5 / 3 |
-| 10 | [Fork/join and parallel streams](#forkjoin-and-parallel-streams) | 10 | 0 / 5 / 5 |
-| 11 | [Virtual threads and structured concurrency](#virtual-threads-and-structured-concurrency) | 11 | 0 / 5 / 6 |
-| 12 | [Concurrency in real systems](#concurrency-in-real-systems) | 10 | 1 / 4 / 5 |
-| 13 | [Deadlock, livelock and diagnostics](#deadlock-livelock-and-diagnostics) | 10 | 0 / 7 / 3 |
+| 10 | [Fork/join and parallel streams](#forkjoin-and-parallel-streams) | 11 | 1 / 5 / 5 |
+| 11 | [Virtual threads and structured concurrency](#virtual-threads-and-structured-concurrency) | 12 | 1 / 5 / 6 |
+| 12 | [Concurrency in real systems](#concurrency-in-real-systems) | 12 | 1 / 5 / 6 |
+| 13 | [Deadlock, livelock and diagnostics](#deadlock-livelock-and-diagnostics) | 11 | 1 / 7 / 3 |
 | 14 | [Patterns and antipatterns](#patterns-and-antipatterns) | 11 | 2 / 7 / 2 |
-| 15 | [Testing concurrent code](#testing-concurrent-code) | 10 | 0 / 5 / 5 |
+| 15 | [Testing concurrent code](#testing-concurrent-code) | 11 | 1 / 5 / 5 |
 | 16 | [Live coding puzzles](#live-coding-puzzles) | 10 | 1 / 5 / 4 |
 
 ### Threads and lifecycle
@@ -222,7 +232,9 @@ Two correct endings. Propagate it, if your signature allows, and let the caller 
 cannot, restore the flag before returning:
 
 ```java
-catch (InterruptedException e) {
+try {
+    task = queue.take();
+} catch (InterruptedException e) {
     Thread.currentThread().interrupt();   // the next blocking call will see it
     return;                               // and stop doing work
 }
@@ -1562,6 +1574,28 @@ holding it.
 
 </details>
 
+<details>
+<summary><b>73. Many threads count words into one map. How do you make the counting correct?</b>  <sub>junior</sub></summary>
+
+Every call on a `ConcurrentHashMap` is thread safe, but two calls in a row are not one operation.
+With `get` then `put`, two threads read the same count, both add one, and one increment is lost. The
+map is fine; the read-modify-write around it is the race. A synchronized wrapper has exactly the same
+hole, because it locks each call, not the pair.
+
+The fix is to hand the whole update to the map, which runs it atomically for that key:
+
+```java
+ConcurrentHashMap<String, Long> counts = new ConcurrentHashMap<>();
+counts.merge(word, 1L, Long::sum);
+```
+
+`compute` and `computeIfAbsent` give the same per-key guarantee. When one key is very hot, the
+threads queue on that key's bin, and the usual next step is a `LongAdder` per key:
+`counts.computeIfAbsent(word, k -> new LongAdder()).increment()`. The map lookup is then read-only for
+existing words, and the increment spreads over cells.
+
+</details>
+
 [back to top](#contents)
 
 ### Executors and thread pools
@@ -1588,7 +1622,7 @@ Runnable: [executors](https://github.com/alxkm/java-concurrency-patterns/tree/ma
 ```
 
 <details>
-<summary><b>73. Walk through what `ThreadPoolExecutor` does with a submitted task.</b>  <sub>mid</sub></summary>
+<summary><b>74. Walk through what `ThreadPoolExecutor` does with a submitted task.</b>  <sub>mid</sub></summary>
 
 The order is the part people get backwards, and it explains most misconfigured pools:
 
@@ -1604,7 +1638,7 @@ configuration and the pool never grows past core. People set a maximum of 200, w
 </details>
 
 <details>
-<summary><b>74. Why is `Executors.newFixedThreadPool` considered dangerous in production?</b>  <sub>mid</sub></summary>
+<summary><b>75. Why is `Executors.newFixedThreadPool` considered dangerous in production?</b>  <sub>mid</sub></summary>
 
 `newFixedThreadPool` and `newSingleThreadExecutor` both use an unbounded queue. When producers outrun
 consumers, nothing pushes back: the queue grows, old GC pressure rises, and the process dies with an
@@ -1626,7 +1660,7 @@ new ThreadPoolExecutor(8, 8, 60, SECONDS,
 </details>
 
 <details>
-<summary><b>75. How do you size a thread pool?</b>  <sub>mid</sub></summary>
+<summary><b>76. How do you size a thread pool?</b>  <sub>mid</sub></summary>
 
 For CPU-bound tasks, more threads than cores only adds context switches: `availableProcessors()`, or
 one less if a thread is needed elsewhere. For blocking tasks the threads are mostly asleep, so the
@@ -1643,7 +1677,7 @@ Virtual threads change this: for blocking work the answer becomes "do not pool a
 </details>
 
 <details>
-<summary><b>76. What is the difference between `shutdown()` and `shutdownNow()`, and how do you shut down properly?</b>  <sub>mid</sub></summary>
+<summary><b>77. What is the difference between `shutdown()` and `shutdownNow()`, and how do you shut down properly?</b>  <sub>mid</sub></summary>
 
 `shutdown()` is graceful: no new submissions, everything already queued still runs. `shutdownNow()`
 tries to stop immediately: it drains the queue, returns the tasks that never ran, and interrupts the
@@ -1667,7 +1701,7 @@ cause of a process that will not exit.
 </details>
 
 <details>
-<summary><b>77. What happens to an exception thrown inside a pooled task?</b>  <sub>mid</sub></summary>
+<summary><b>78. What happens to an exception thrown inside a pooled task?</b>  <sub>mid</sub></summary>
 
 This asymmetry swallows more bugs than any other part of the API. `execute(Runnable)` lets the
 exception propagate: the thread's `UncaughtExceptionHandler` runs (by default printing to stderr) and
@@ -1683,7 +1717,7 @@ Defences: wrap task bodies in try/catch, override `afterExecute` to inspect both
 </details>
 
 <details>
-<summary><b>78. What happens when a `ScheduledExecutorService` task throws?</b>  <sub>senior</sub></summary>
+<summary><b>79. What happens when a `ScheduledExecutorService` task throws?</b>  <sub>senior</sub></summary>
 
 `scheduleAtFixedRate` and `scheduleWithFixedDelay` stop rescheduling if the task throws. The
 `ScheduledFuture` completes exceptionally, and because nobody holds it, the failure is invisible. The
@@ -1708,7 +1742,7 @@ end to start and cannot.
 </details>
 
 <details>
-<summary><b>79. Which rejection policy would you choose and why?</b>  <sub>senior</sub></summary>
+<summary><b>80. Which rejection policy would you choose and why?</b>  <sub>senior</sub></summary>
 
 `AbortPolicy` (the default) throws `RejectedExecutionException`, which is honest: the caller learns
 the system is saturated and can shed load, return 503 or retry.
@@ -1726,7 +1760,7 @@ operational signal.
 </details>
 
 <details>
-<summary><b>80. What is `invokeAll` versus `invokeAny`, and where does `CompletionService` fit?</b>  <sub>mid</sub></summary>
+<summary><b>81. What is `invokeAll` versus `invokeAny`, and where does `CompletionService` fit?</b>  <sub>mid</sub></summary>
 
 `invokeAll` submits a batch and blocks until every task is done (or the timeout expires), returning
 futures in the order of the input, all of them already complete. `invokeAny` is the racing variant: the
@@ -1743,7 +1777,7 @@ In modern code `CompletableFuture.allOf` / `anyOf` covers the same ground non-bl
 </details>
 
 <details>
-<summary><b>81. Why name your threads, and how?</b>  <sub>junior</sub></summary>
+<summary><b>82. Why name your threads, and how?</b>  <sub>junior</sub></summary>
 
 Thread names are the primary label in thread dumps, profilers, APM traces and log MDCs. When
 production is on fire and the dump shows 200 threads called `pool-2-thread-N`, you cannot tell which
@@ -1756,7 +1790,7 @@ handful of lines will do, and it costs nothing at runtime.
 </details>
 
 <details>
-<summary><b>82. Why must a `ThreadLocal` be removed in a pooled thread?</b>  <sub>senior</sub></summary>
+<summary><b>83. Why must a `ThreadLocal` be removed in a pooled thread?</b>  <sub>senior</sub></summary>
 
 A `ThreadLocal` entry lives in a map owned by the thread. In a pool the thread is reused indefinitely,
 so the value is never collected, which in an application server means a retained classloader and the
@@ -1782,7 +1816,7 @@ structured concurrency forks without any of this.
 </details>
 
 <details>
-<summary><b>83. What is work stealing, and which executors use it?</b>  <sub>senior</sub></summary>
+<summary><b>84. What is work stealing, and which executors use it?</b>  <sub>senior</sub></summary>
 
 In a classic pool, all workers contend on one shared queue, and that queue is the bottleneck. In a
 work-stealing pool each worker owns a double-ended queue. It pushes and pops from its own end (LIFO,
@@ -1797,7 +1831,7 @@ and just as fast.
 </details>
 
 <details>
-<summary><b>84. What breaks when a pooled task submits another task to the same pool and waits for it?</b>  <sub>senior</sub></summary>
+<summary><b>85. What breaks when a pooled task submits another task to the same pool and waits for it?</b>  <sub>senior</sub></summary>
 
 With a pool of N threads, if N tasks each block on the result of a subtask they submitted to the same
 pool, there is no thread left to run any subtask. Nothing is deadlocked in the lock sense, so a dump
@@ -1834,7 +1868,7 @@ Runnable: [future](https://github.com/alxkm/java-concurrency-patterns/tree/maste
 ```
 
 <details>
-<summary><b>85. What does `CompletableFuture` add over `Future`?</b>  <sub>junior</sub></summary>
+<summary><b>86. What does `CompletableFuture` add over `Future`?</b>  <sub>junior</sub></summary>
 
 `Future` gives you `get()` and `isDone()`, which means the only way to use a result is to block on it
 or poll for it. Composing two of them means blocking on the first to start the second.
@@ -1848,7 +1882,7 @@ library.
 </details>
 
 <details>
-<summary><b>86. What is the difference between `thenApply` and `thenCompose`?</b>  <sub>mid</sub></summary>
+<summary><b>87. What is the difference between `thenApply` and `thenCompose`?</b>  <sub>mid</sub></summary>
 
 It is `map` versus `flatMap`. If your function returns a plain value, use `thenApply`. If it returns
 another `CompletableFuture`, which is what any further async call gives you, `thenApply` wraps it and
@@ -1865,7 +1899,7 @@ results and neither depends on the other.
 </details>
 
 <details>
-<summary><b>87. Which thread runs your callback if you use `thenApply` rather than `thenApplyAsync`?</b>  <sub>senior</sub></summary>
+<summary><b>88. Which thread runs your callback if you use `thenApply` rather than `thenApplyAsync`?</b>  <sub>senior</sub></summary>
 
 The non-async variants run on whatever thread happens to make the value available. If the previous
 stage is still running, the callback runs on the thread that completes it. If the future was already
@@ -1882,7 +1916,7 @@ The `*Async` variants take control back: with no executor argument they use the 
 </details>
 
 <details>
-<summary><b>88. Why should you pass an explicit executor to the `*Async` methods?</b>  <sub>mid</sub></summary>
+<summary><b>89. Why should you pass an explicit executor to the `*Async` methods?</b>  <sub>mid</sub></summary>
 
 `supplyAsync(task)` and `thenApplyAsync(fn)` default to `ForkJoinPool.commonPool()`. It has
 `availableProcessors() - 1` threads and is shared with every parallel stream in the JVM, including
@@ -1898,7 +1932,7 @@ downstream dependency so a slow service cannot take the others with it.
 </details>
 
 <details>
-<summary><b>89. How do exceptions propagate through a chain, and what do `exceptionally`, `handle` and `whenComplete` do?</b>  <sub>mid</sub></summary>
+<summary><b>90. How do exceptions propagate through a chain, and what do `exceptionally`, `handle` and `whenComplete` do?</b>  <sub>mid</sub></summary>
 
 A stage that throws completes exceptionally, and every downstream `thenApply` is skipped, carrying the
 failure along wrapped in a `CompletionException`.
@@ -1916,7 +1950,7 @@ joins, gets or handles swallows its failure completely.
 </details>
 
 <details>
-<summary><b>90. What does `allOf` return, and how do you collect the results?</b>  <sub>mid</sub></summary>
+<summary><b>91. What does `allOf` return, and how do you collect the results?</b>  <sub>mid</sub></summary>
 
 `allOf` cannot know the types are the same, so it gives you `CompletableFuture<Void>` as a
 completion signal only. The idiom:
@@ -1938,7 +1972,7 @@ others, so add a timeout with `orTimeout` or `completeOnTimeout` per call. And `
 </details>
 
 <details>
-<summary><b>91. Does cancelling a `CompletableFuture` stop the work?</b>  <sub>senior</sub></summary>
+<summary><b>92. Does cancelling a `CompletableFuture` stop the work?</b>  <sub>senior</sub></summary>
 
 `CompletableFuture.cancel(mayInterruptIfRunning)` ignores its argument. A `CompletableFuture` is a
 value holder with no link back to whoever is computing it, so all cancelling does is complete it with a
@@ -1953,7 +1987,7 @@ propagate.
 </details>
 
 <details>
-<summary><b>92. How do you add a timeout to a `CompletableFuture`?</b>  <sub>mid</sub></summary>
+<summary><b>93. How do you add a timeout to a `CompletableFuture`?</b>  <sub>mid</sub></summary>
 
 `get(timeout, unit)` bounds how long *you* wait, but it blocks a thread to do it and leaves the task
 running. Since Java 9 there are two non-blocking alternatives:
@@ -1971,7 +2005,7 @@ call, so a slow downstream request still occupies its connection until it finish
 </details>
 
 <details>
-<summary><b>93. What is the difference between `join()` and `get()`?</b>  <sub>junior</sub></summary>
+<summary><b>94. What is the difference between `join()` and `get()`?</b>  <sub>junior</sub></summary>
 
 Functionally both block until the result is available. The difference is the exceptions: `get()` is
 `Future`'s method with checked exceptions, and `join()` is unchecked, which is why it works inside
@@ -1984,7 +2018,7 @@ of your system, where you genuinely have to wait.
 </details>
 
 <details>
-<summary><b>94. When is `CompletableFuture` the wrong tool now that virtual threads exist?</b>  <sub>senior</sub></summary>
+<summary><b>95. When is `CompletableFuture` the wrong tool now that virtual threads exist?</b>  <sub>senior</sub></summary>
 
 Async composition exists because blocking a platform thread is expensive. Virtual threads remove that
 premise: a blocked virtual thread unmounts from its carrier and costs almost nothing, so plain
@@ -2023,7 +2057,7 @@ Runnable: [fork/join](https://github.com/alxkm/java-concurrency-patterns/tree/ma
 ```
 
 <details>
-<summary><b>95. How does `ForkJoinPool` differ from a fixed thread pool?</b>  <sub>mid</sub></summary>
+<summary><b>96. How does `ForkJoinPool` differ from a fixed thread pool?</b>  <sub>mid</sub></summary>
 
 A fixed pool has one shared queue, and every worker contends on it. A fork/join pool gives each worker
 a deque it owns, pushing and popping its own end with no contention, and stealing from the other end of
@@ -2039,7 +2073,7 @@ over a plain pool, and its assumptions actively hurt.
 </details>
 
 <details>
-<summary><b>96. What is the correct shape of a `RecursiveTask`?</b>  <sub>mid</sub></summary>
+<summary><b>97. What is the correct shape of a `RecursiveTask`?</b>  <sub>mid</sub></summary>
 
 ```java
 protected Long compute() {
@@ -2064,7 +2098,7 @@ usual starting point is a few thousand elements of simple work, tuned by measure
 </details>
 
 <details>
-<summary><b>97. What is the common pool, and why does it cause trouble?</b>  <sub>senior</sub></summary>
+<summary><b>98. What is the common pool, and why does it cause trouble?</b>  <sub>senior</sub></summary>
 
 `ForkJoinPool.commonPool()` is a static, shared, lazily created pool sized at
 `availableProcessors() - 1`. Every parallel stream in the JVM uses it, including ones inside libraries,
@@ -2081,7 +2115,7 @@ works because the stream uses the pool of the thread it runs on.
 </details>
 
 <details>
-<summary><b>98. When is a parallel stream faster, and when is it slower?</b>  <sub>mid</sub></summary>
+<summary><b>99. When is a parallel stream faster, and when is it slower?</b>  <sub>mid</sub></summary>
 
 The rough rule of thumb is N times Q: the number of elements times the cost per element. If that
 product is not in the hundreds of thousands of cycles, the splitting, task submission and merging cost
@@ -2099,7 +2133,7 @@ Measure both, on production-shaped data.
 </details>
 
 <details>
-<summary><b>99. Why is `forEach` on a parallel stream dangerous, and what should you use?</b>  <sub>mid</sub></summary>
+<summary><b>100. Why is `forEach` on a parallel stream dangerous, and what should you use?</b>  <sub>mid</sub></summary>
 
 `forEach` makes no ordering promise and calls your lambda from every worker thread at once. Adding to
 an `ArrayList` from it corrupts the list; adding to a `Collectors.toList` result via a side effect is
@@ -2119,7 +2153,7 @@ even a synchronized list is the wrong fix, since every element then serialises o
 </details>
 
 <details>
-<summary><b>100. What does `Collectors.toConcurrentMap` change, and when is `groupingByConcurrent` actually used?</b>  <sub>senior</sub></summary>
+<summary><b>101. What does `Collectors.toConcurrentMap` change, and when is `groupingByConcurrent` actually used?</b>  <sub>senior</sub></summary>
 
 An ordinary `groupingBy` in a parallel stream gives each thread its own map and merges them at the end,
 which allocates and copies. The concurrent versions declare the `CONCURRENT` characteristic, so the
@@ -2135,7 +2169,7 @@ In practice: profile first. The sequential collector plus merge wins more often 
 </details>
 
 <details>
-<summary><b>101. What is a `Spliterator` and why does it matter for parallelism?</b>  <sub>senior</sub></summary>
+<summary><b>102. What is a `Spliterator` and why does it matter for parallelism?</b>  <sub>senior</sub></summary>
 
 Every stream is backed by a `Spliterator`. Sequentially it behaves like an iterator via
 `tryAdvance`/`forEachRemaining`; in parallel the framework calls `trySplit` recursively to build the
@@ -2153,7 +2187,7 @@ If you write a custom data source and want parallel streams over it to be worth 
 </details>
 
 <details>
-<summary><b>102. Can you run a parallel stream in your own pool, and should you?</b>  <sub>senior</sub></summary>
+<summary><b>103. Can you run a parallel stream in your own pool, and should you?</b>  <sub>senior</sub></summary>
 
 There is no API for it. The trick works because a parallel stream executes in the pool of the thread
 that runs it:
@@ -2175,7 +2209,7 @@ executor with explicit tasks is clearer than a stream.
 </details>
 
 <details>
-<summary><b>103. Why is `Stream.iterate` a poor source for a parallel stream?</b>  <sub>mid</sub></summary>
+<summary><b>104. Why is `Stream.iterate` a poor source for a parallel stream?</b>  <sub>mid</sub></summary>
 
 `Stream.iterate(0, i -> i + 1)` is inherently sequential: element N cannot be produced without
 producing N-1. Its spliterator cannot split usefully, so the framework buffers chunks and you get the
@@ -2189,7 +2223,7 @@ cannot help, no matter how expensive the per-element work is.
 </details>
 
 <details>
-<summary><b>104. What happens if a fork/join task blocks on I/O?</b>  <sub>senior</sub></summary>
+<summary><b>105. What happens if a fork/join task blocks on I/O?</b>  <sub>senior</sub></summary>
 
 Fork/join is sized for CPU work, with roughly one thread per core, and its whole model assumes tasks
 finish quickly and often spawn subtasks. A worker blocked on a socket does none of that: it holds a
@@ -2202,6 +2236,27 @@ pool may compensate by starting an extra thread. `ConcurrentHashMap.computeIfAbs
 
 The better answer in 2026 is that blocking work belongs on virtual threads or a dedicated pool, and
 fork/join should keep to what it was built for.
+
+</details>
+
+<details>
+<summary><b>106. What does `parallelStream()` change compared with `stream()`?</b>  <sub>junior</sub></summary>
+
+The pipeline is the same; the execution is not. The source is split by its `Spliterator`, the
+chunks run as fork/join tasks in `ForkJoinPool.commonPool()`, and the calling thread joins in rather
+than waiting idle. The common pool has one thread fewer than there are cores, so with the caller the
+work uses every core.
+
+Three consequences are what the interviewer is after:
+
+- **Order is not guaranteed** for `forEach`. Use `forEachOrdered`, or better, a collector.
+- **Side effects break.** Adding to a shared `ArrayList` from `forEach` loses elements or throws.
+  `collect(toList())` is correct in parallel because each chunk builds its own list and they are merged.
+- **It is not automatically faster.** Splitting and merging cost something, so a few thousand cheap
+  operations usually run slower in parallel. Measure first.
+
+And the one that bites in production: every parallel stream in the JVM shares that one common pool,
+so a slow or blocking operation in one of them slows down all the others.
 
 </details>
 
@@ -2226,7 +2281,7 @@ Runnable: [virtual threads](https://github.com/alxkm/java-concurrency-patterns/t
 ```
 
 <details>
-<summary><b>105. What is a virtual thread, and how is it scheduled?</b>  <sub>mid</sub></summary>
+<summary><b>107. What is a virtual thread, and how is it scheduled?</b>  <sub>mid</sub></summary>
 
 A virtual thread is an ordinary `java.lang.Thread` whose execution is a continuation the JVM can park
 and resume. When it blocks, the JVM saves its stack to the heap, unmounts it from its carrier, and the
@@ -2243,7 +2298,7 @@ stack traces all work, which is the entire point.
 </details>
 
 <details>
-<summary><b>106. What is pinning, and what causes it?</b>  <sub>senior</sub></summary>
+<summary><b>108. What is pinning, and what causes it?</b>  <sub>senior</sub></summary>
 
 If a virtual thread blocks while it holds a monitor, the JVM cannot unmount it, because the monitor is
 tied to the carrier's stack frame. The carrier is occupied for the whole blocking call. With a default
@@ -2262,7 +2317,7 @@ asked and the JFR event is still the way to check.
 </details>
 
 <details>
-<summary><b>107. Should you pool virtual threads?</b>  <sub>mid</sub></summary>
+<summary><b>109. Should you pool virtual threads?</b>  <sub>mid</sub></summary>
 
 A pool exists to amortise the cost of an expensive resource. A virtual thread is not expensive, so a
 pool of them adds a queue, a lifetime that outlives the task and all the `ThreadLocal` leakage problems
@@ -2285,7 +2340,7 @@ constraint (the downstream service tolerates 50 in flight) rather than hiding it
 </details>
 
 <details>
-<summary><b>108. When do virtual threads not help?</b>  <sub>senior</sub></summary>
+<summary><b>110. When do virtual threads not help?</b>  <sub>senior</sub></summary>
 
 Virtual threads make blocking cheap. They do not create CPU capacity. A thousand virtual threads doing
 matrix multiplication finish no sooner than a pool of N platform threads, and you have added scheduling
@@ -2303,7 +2358,7 @@ threads with deep stacks is a real number in your heap dump.
 </details>
 
 <details>
-<summary><b>109. What problem does structured concurrency solve?</b>  <sub>mid</sub></summary>
+<summary><b>111. What problem does structured concurrency solve?</b>  <sub>mid</sub></summary>
 
 With an executor, a submitted task's lifetime is unrelated to the code that submitted it. If the caller
 returns early or fails, the subtasks keep running, and cancelling them is manual bookkeeping everyone
@@ -2329,7 +2384,7 @@ name the concept confidently and the exact signature with a caveat.
 </details>
 
 <details>
-<summary><b>110. What are `ShutdownOnFailure` and `ShutdownOnSuccess` for?</b>  <sub>senior</sub></summary>
+<summary><b>112. What are `ShutdownOnFailure` and `ShutdownOnSuccess` for?</b>  <sub>senior</sub></summary>
 
 `ShutdownOnFailure` is the "all must succeed" case, which is most fan-out: three service calls to
 assemble one page, where any failure makes the whole page impossible. The first exception cancels the
@@ -2345,7 +2400,7 @@ policies such as "wait for a quorum". The concepts are the same; only the spelli
 </details>
 
 <details>
-<summary><b>111. What is a `ScopedValue`, and why is it preferred to `ThreadLocal` here?</b>  <sub>senior</sub></summary>
+<summary><b>113. What is a `ScopedValue`, and why is it preferred to `ThreadLocal` here?</b>  <sub>senior</sub></summary>
 
 `ThreadLocal` is mutable, unbounded in lifetime and must be removed by hand, which is unmanageable when
 threads number in the millions and are created per task. `InheritableThreadLocal` copies the whole map
@@ -2367,7 +2422,7 @@ as a parameter.
 </details>
 
 <details>
-<summary><b>112. How do you debug a system running a million virtual threads?</b>  <sub>senior</sub></summary>
+<summary><b>114. How do you debug a system running a million virtual threads?</b>  <sub>senior</sub></summary>
 
 `jstack` and the classic dump show only platform threads, so your carriers appear and the million
 virtual threads on top of them do not. The replacement is
@@ -2381,7 +2436,7 @@ produce a dump measured in hundreds of megabytes, so grep it rather than reading
 </details>
 
 <details>
-<summary><b>113. Do virtual threads change how you use `synchronized` in library code?</b>  <sub>senior</sub></summary>
+<summary><b>115. Do virtual threads change how you use `synchronized` in library code?</b>  <sub>senior</sub></summary>
 
 On JDK 21 through 23, blocking inside `synchronized` pins the carrier thread. A library that wraps its
 I/O in a monitor (plenty of older JDBC drivers and HTTP clients did) will pin every virtual thread that
@@ -2397,7 +2452,7 @@ entirely on which JVM the team is on.
 </details>
 
 <details>
-<summary><b>114. Is `Thread.sleep` still a bad idea on a virtual thread?</b>  <sub>mid</sub></summary>
+<summary><b>116. Is `Thread.sleep` still a bad idea on a virtual thread?</b>  <sub>mid</sub></summary>
 
 `Thread.sleep` is one of the JDK calls made virtual-thread aware. On a virtual thread it parks the
 continuation and frees the carrier, so a million sleeping virtual threads consume essentially no OS
@@ -2414,7 +2469,7 @@ cost.
 </details>
 
 <details>
-<summary><b>115. What does `Executors.newVirtualThreadPerTaskExecutor().close()` do?</b>  <sub>mid</sub></summary>
+<summary><b>117. What does `Executors.newVirtualThreadPerTaskExecutor().close()` do?</b>  <sub>mid</sub></summary>
 
 `ExecutorService` extends `AutoCloseable` since Java 19, and `close()` means shutdown plus
 `awaitTermination`, retrying on interrupt. With try-with-resources that gives you a scope whose closing
@@ -2429,6 +2484,26 @@ try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
 This is structured concurrency's shape without its error propagation: a failure in one task does not
 cancel the others, and you still collect outcomes from the futures yourself. It is the pragmatic
 halfway house available today in stable API.
+
+</details>
+
+<details>
+<summary><b>118. Is a virtual thread faster than a platform thread?</b>  <sub>junior</sub></summary>
+
+A virtual thread runs ordinary bytecode on an ordinary platform thread, its carrier. Nothing about
+the code itself gets faster, and one request takes as long as it did before.
+
+What changes is the price of waiting. A platform thread is an OS thread with a stack reserved up
+front, so a server can afford a few thousand of them. A virtual thread is a small heap object; when it
+blocks on I/O or a lock it unmounts and frees the carrier for another one. A million of them waiting
+on sockets is fine.
+
+So the win is **throughput for I/O-bound work**: with many requests each spending most of their time
+waiting, you can have one thread per request instead of a pool that runs out. For CPU-bound work
+there is no win at all: the carriers are as many as the cores, and the cores were already busy.
+
+A good answer ends with the caveat: more concurrent requests means more pressure on whatever they
+wait for. The database pool is still ten connections, so bound it with a `Semaphore`.
 
 </details>
 
@@ -2457,7 +2532,7 @@ Runnable: [object pool](https://github.com/alxkm/java-concurrency-patterns/tree/
 ```
 
 <details>
-<summary><b>116. Which thread runs a Spring `@Async` method, and what does it lose?</b>  <sub>mid</sub></summary>
+<summary><b>119. Which thread runs a Spring `@Async` method, and what does it lose?</b>  <sub>mid</sub></summary>
 
 `@Async` returns immediately and runs the method on the `TaskExecutor` bean. Three things do not travel
 with it, and all three are `ThreadLocal`-based: the transaction bound to the calling thread, the
@@ -2480,7 +2555,7 @@ because the proxy is bypassed, and a `void` `@Async` method throws into the void
 </details>
 
 <details>
-<summary><b>117. Why does `@Transactional` not work across threads?</b>  <sub>mid</sub></summary>
+<summary><b>120. Why does `@Transactional` not work across threads?</b>  <sub>mid</sub></summary>
 
 Spring keeps the active transaction and its connection in `TransactionSynchronizationManager`, which is
 `ThreadLocal`-backed. Work handed to another thread, by `@Async`, an executor or a parallel stream,
@@ -2498,7 +2573,7 @@ or give each task its own short transaction and make the whole thing idempotent.
 </details>
 
 <details>
-<summary><b>118. Your service has 200 HTTP threads and a pool of 10 database connections. Where is the bottleneck?</b>  <sub>senior</sub></summary>
+<summary><b>121. Your service has 200 HTTP threads and a pool of 10 database connections. Where is the bottleneck?</b>  <sub>senior</sub></summary>
 
 The scarcest resource sets the throughput. With 10 connections, at most 10 requests are doing database
 work at any moment; the other 190 threads are either idle or queued inside the pool's borrow call,
@@ -2517,7 +2592,7 @@ invisible limit imposed by a thread pool.
 </details>
 
 <details>
-<summary><b>119. Is a Spring singleton bean thread safe?</b>  <sub>junior</sub></summary>
+<summary><b>122. Is a Spring singleton bean thread safe?</b>  <sub>junior</sub></summary>
 
 A singleton bean is one instance for the whole container, called by every request thread at once.
 Spring adds no synchronisation. Injected collaborators and configuration read at startup are fine
@@ -2535,7 +2610,7 @@ be cleared, because the container's thread is pooled and the next request inheri
 </details>
 
 <details>
-<summary><b>120. What is the servlet thread model, and what does async servlet processing change?</b>  <sub>senior</sub></summary>
+<summary><b>123. What is the servlet thread model, and what does async servlet processing change?</b>  <sub>senior</sub></summary>
 
 Classic servlet processing binds a container thread to a request from the first byte to the last. A
 request that spends 500 ms waiting on a downstream service occupies a thread for 500 ms, so the thread
@@ -2554,7 +2629,7 @@ instead of removing it.
 </details>
 
 <details>
-<summary><b>121. What does a reactive framework buy you over threads, and what does it cost?</b>  <sub>senior</sub></summary>
+<summary><b>124. What does a reactive framework buy you over threads, and what does it cost?</b>  <sub>senior</sub></summary>
 
 Reactor, RxJava and the rest run your pipeline on a small event loop, typically one thread per core.
 Because no thread ever blocks, tens of thousands of in-flight requests cost almost nothing, and
@@ -2572,7 +2647,7 @@ semantics, backpressure across a pipeline, or the operator vocabulary for compos
 </details>
 
 <details>
-<summary><b>122. How do you propagate request context (trace id, user) across threads?</b>  <sub>mid</sub></summary>
+<summary><b>125. How do you propagate request context (trace id, user) across threads?</b>  <sub>mid</sub></summary>
 
 Context lives in `ThreadLocal`s (MDC, `SecurityContextHolder`, tracing spans), and a `ThreadLocal` does
 not follow work to another thread. Submitting to an executor loses all of it, which is why async logs
@@ -2590,7 +2665,7 @@ someone else's user id.
 </details>
 
 <details>
-<summary><b>123. `HttpClient`, `RestTemplate` or `WebClient`: what concurrency questions do you ask before choosing?</b>  <sub>mid</sub></summary>
+<summary><b>126. `HttpClient`, `RestTemplate` or `WebClient`: what concurrency questions do you ask before choosing?</b>  <sub>mid</sub></summary>
 
 All three are thread safe and meant to be shared. Creating one per request is the common mistake: it
 allocates a fresh connection pool, discards keep-alive, and in the worst case leaks threads, which
@@ -2608,7 +2683,7 @@ back, applied where it belongs.
 </details>
 
 <details>
-<summary><b>124. What breaks when you use a parallel stream inside a web request?</b>  <sub>senior</sub></summary>
+<summary><b>127. What breaks when you use a parallel stream inside a web request?</b>  <sub>senior</sub></summary>
 
 A parallel stream uses `ForkJoinPool.commonPool()`, which has `availableProcessors() - 1` threads for
 the entire JVM. Under one request it looks fast. Under a hundred concurrent requests, they all compete
@@ -2625,7 +2700,7 @@ easier to reason about.
 </details>
 
 <details>
-<summary><b>125. How does a connection pool interact with your thread pool, and what should you monitor?</b>  <sub>senior</sub></summary>
+<summary><b>128. How does a connection pool interact with your thread pool, and what should you monitor?</b>  <sub>senior</sub></summary>
 
 Every borrow from a connection pool is a blocking wait inside a worker thread. That makes the two pools
 a two-stage queue: requests queue for a thread, then threads queue for a connection. Sizing one without
@@ -2639,6 +2714,56 @@ depth, rejected task count, and the 99th percentile of both. HikariCP exposes al
 Two failure modes to name. A connection held across a remote call multiplies its hold time by the
 slowest dependency. And a thread that borrows two connections at once, typically a nested transaction,
 can deadlock the pool entirely when enough threads hold one and wait for another.
+
+</details>
+
+<details>
+<summary><b>129. Why can one slow `@Scheduled` job delay every other scheduled job in a Spring app?</b>  <sub>mid</sub></summary>
+
+Without configuration, Spring Framework schedules on a single-threaded executor, and Spring Boot's
+auto-configured `ThreadPoolTaskScheduler` has `spring.task.scheduling.pool.size=1`. Every
+`@Scheduled` method in the application shares that one thread. A report that takes ten minutes means
+the cache refresh due every minute runs ten minutes late, and nothing in the logs says so.
+
+The fixes, depending on what the jobs are:
+
+- Raise `spring.task.scheduling.pool.size`, or define your own `TaskScheduler` bean.
+- Keep the scheduled method short and hand the heavy work to a dedicated executor.
+- On Boot 3.2 and later, `spring.threads.virtual.enabled=true` switches scheduling to a virtual
+  thread per run.
+
+Two related facts come up in the follow-up. A single job never overlaps itself: with `fixedRate`, a
+run that overruns makes the next one start late, not concurrently. And an exception is logged and the
+schedule continues, unlike a raw `ScheduledExecutorService`, where one exception silently cancels
+every future run. Finally, with several instances of the service, each one runs the job; making it
+run once per cluster needs a lock outside the JVM, such as ShedLock.
+
+</details>
+
+<details>
+<summary><b>130. `KafkaConsumer` is not thread safe. How do you process its records in parallel?</b>  <sub>senior</sub></summary>
+
+A `KafkaConsumer` refuses to be used from two threads at once and throws
+`ConcurrentModificationException` when it is. The only method safe to call from another thread is
+`wakeup()`, which exists to break a blocked `poll()` during shutdown. So there are two shapes:
+
+**One consumer per thread.** Each consumer in the group owns some partitions and processes them in
+order. It is simple and keeps per-partition ordering, but parallelism is capped by the number of
+partitions: the eleventh consumer on a ten-partition topic sits idle. Spring Kafka's `concurrency`
+setting is exactly this.
+
+**One poller, many workers.** A single thread polls and hands records to a pool. Parallelism is no
+longer tied to partitions, but three things become your job:
+
+- **Commits.** Commit an offset only when everything before it in that partition has finished, or a
+  crash skips records. Auto-commit here commits work that never ran.
+- **Liveness.** Keep calling `poll()`; if the gap exceeds `max.poll.interval.ms`, the group decides
+  the consumer is dead and rebalances. Use `pause()` and `resume()` for backpressure instead.
+- **Ordering.** Records for one key must go to the same worker if order matters, for example by
+  hashing the key onto a fixed set of single-threaded executors.
+
+Libraries such as Confluent's parallel consumer package the second shape with per-key ordering, and
+knowing that they exist is part of a senior answer.
 
 </details>
 
@@ -2663,7 +2788,7 @@ Runnable: [deadlock](https://github.com/alxkm/java-concurrency-patterns/tree/mas
 ```
 
 <details>
-<summary><b>126. What four conditions must hold for a deadlock, and which is easiest to break?</b>  <sub>mid</sub></summary>
+<summary><b>131. What four conditions must hold for a deadlock, and which is easiest to break?</b>  <sub>mid</sub></summary>
 
 All four Coffman conditions must hold at once, so removing any one prevents deadlock. In Java you
 cannot remove mutual exclusion (that is the point of a lock) and you cannot preempt a monitor.
@@ -2679,7 +2804,7 @@ critical sections.
 </details>
 
 <details>
-<summary><b>127. Show the classic transfer deadlock and fix it.</b>  <sub>mid</sub></summary>
+<summary><b>132. Show the classic transfer deadlock and fix it.</b>  <sub>mid</sub></summary>
 
 ```java
 void transfer(Account from, Account to, long amount) {
@@ -2706,7 +2831,7 @@ after a random backoff, which also handles locks you do not control.
 </details>
 
 <details>
-<summary><b>128. How do you diagnose a deadlock in a running JVM?</b>  <sub>mid</sub></summary>
+<summary><b>133. How do you diagnose a deadlock in a running JVM?</b>  <sub>mid</sub></summary>
 
 `jcmd <pid> Thread.print` or `jstack <pid>` gives you the dump, and HotSpot does the analysis for you:
 it walks the monitor ownership graph and prints a "Found one Java-level deadlock" section naming both
@@ -2724,7 +2849,7 @@ moving.
 </details>
 
 <details>
-<summary><b>129. What is a livelock, and how does it differ from a deadlock?</b>  <sub>mid</sub></summary>
+<summary><b>134. What is a livelock, and how does it differ from a deadlock?</b>  <sub>mid</sub></summary>
 
 The corridor analogy: two people step aside for each other, repeatedly, in the same direction. Nobody
 is blocked, everybody is polite, nobody gets through.
@@ -2741,7 +2866,7 @@ back and forth forever.
 </details>
 
 <details>
-<summary><b>130. What is starvation, and what causes it in a JVM?</b>  <sub>mid</sub></summary>
+<summary><b>135. What is starvation, and what causes it in a JVM?</b>  <sub>mid</sub></summary>
 
 Starvation is progress denied indefinitely to one thread while others proceed. The usual causes: an
 unfair lock where arriving threads barge ahead of the queue; long-running tasks in a small pool leaving
@@ -2758,7 +2883,7 @@ make deliberately.
 </details>
 
 <details>
-<summary><b>131. How do you read a thread dump? What do you look for first?</b>  <sub>senior</sub></summary>
+<summary><b>136. How do you read a thread dump? What do you look for first?</b>  <sub>senior</sub></summary>
 
 A method, in order:
 
@@ -2777,7 +2902,7 @@ socket I/O still reports RUNNABLE. That misleads people constantly.
 </details>
 
 <details>
-<summary><b>132. Your service stops responding but CPU is at zero. What is your first hypothesis?</b>  <sub>senior</sub></summary>
+<summary><b>137. Your service stops responding but CPU is at zero. What is your first hypothesis?</b>  <sub>senior</sub></summary>
 
 Zero CPU with no progress means nobody is running, so look for where they are all parked. The three
 usual shapes: a genuine deadlock cycle; a thread pool whose every worker is waiting on a slow or
@@ -2794,7 +2919,7 @@ which you separate with `jcmd GC.heap_info` or a GC log rather than a thread dum
 </details>
 
 <details>
-<summary><b>133. Which JDK tools do you use for concurrency problems?</b>  <sub>mid</sub></summary>
+<summary><b>138. Which JDK tools do you use for concurrency problems?</b>  <sub>mid</sub></summary>
 
 The toolbox worth naming:
 
@@ -2812,7 +2937,7 @@ interleaving you are trying to observe.
 </details>
 
 <details>
-<summary><b>134. Why does a debugger so often make a concurrency bug disappear?</b>  <sub>mid</sub></summary>
+<summary><b>139. Why does a debugger so often make a concurrency bug disappear?</b>  <sub>mid</sub></summary>
 
 A concurrency bug is a property of one interleaving out of many. Anything that changes timing changes
 the distribution of interleavings: a breakpoint suspends threads, a `println` takes a lock on the
@@ -2830,7 +2955,7 @@ happens-before rather than about observed behaviour.
 </details>
 
 <details>
-<summary><b>135. A colleague reports a bug that happens once a week in production and never locally. How do you approach it?</b>  <sub>senior</sub></summary>
+<summary><b>140. A colleague reports a bug that happens once a week in production and never locally. How do you approach it?</b>  <sub>senior</sub></summary>
 
 Once a week means an interleaving that needs an unlikely coincidence, which is the signature of a data
 race rather than a logic error. The productive order:
@@ -2845,6 +2970,30 @@ race rather than a logic error. The productive order:
    quarterly one that is far harder to find.
 
 Saying "a retry makes it rarer, not absent" is usually what the interviewer is listening for.
+
+</details>
+
+<details>
+<summary><b>141. What is a deadlock, and why does it not resolve itself?</b>  <sub>junior</sub></summary>
+
+The smallest example is two threads taking the same two locks in opposite order:
+
+```java
+Object a = new Object(), b = new Object();
+new Thread(() -> { synchronized (a) { pause(); synchronized (b) { } } }).start();
+new Thread(() -> { synchronized (b) { pause(); synchronized (a) { } } }).start();
+```
+
+Each holds one lock and waits for the other. `synchronized` has no timeout and cannot be interrupted,
+and the JVM does not break deadlocks. A database picks a victim and rolls it back; the JVM just
+leaves both threads blocked, forever, with zero CPU.
+
+That is also how it looks from outside: the service stops answering but is not busy. A thread dump
+(`jstack <pid>`) says it directly, with a section titled "Found one Java-level deadlock" that names
+the threads and the locks.
+
+The fixes follow from the example: always take locks in one global order, hold as few as possible at
+once, or use `ReentrantLock.tryLock` with a timeout so a thread can back off instead of waiting forever.
 
 </details>
 
@@ -2869,7 +3018,7 @@ Runnable: [patterns](https://github.com/alxkm/java-concurrency-patterns/tree/mas
 ```
 
 <details>
-<summary><b>136. What does thread confinement mean, and what are the three kinds?</b>  <sub>mid</sub></summary>
+<summary><b>142. What does thread confinement mean, and what are the three kinds?</b>  <sub>mid</sub></summary>
 
 Data that only one thread can reach needs no synchronisation at all, which makes confinement the
 cheapest correct answer available.
@@ -2886,7 +3035,7 @@ from a background thread is a bug even though nothing throws.
 </details>
 
 <details>
-<summary><b>137. Why is immutability the strongest thread safety guarantee?</b>  <sub>junior</sub></summary>
+<summary><b>143. Why is immutability the strongest thread safety guarantee?</b>  <sub>junior</sub></summary>
 
 An immutable object has no writes after construction, so there is nothing for two threads to disagree
 about. The final-field guarantee means that any thread obtaining a reference sees the fields fully
@@ -2902,7 +3051,7 @@ is only as immutable as its components.
 </details>
 
 <details>
-<summary><b>138. What is the producer/consumer pattern and what does the queue actually provide?</b>  <sub>junior</sub></summary>
+<summary><b>144. What is the producer/consumer pattern and what does the queue actually provide?</b>  <sub>junior</sub></summary>
 
 Producers and consumers never touch each other's data; the only shared object is the queue, and
 `BlockingQueue` handles the synchronisation, the blocking and the memory visibility (a `put`
@@ -2919,7 +3068,7 @@ exits, rather than interrupting mid-work. A thread pool is this pattern wearing 
 </details>
 
 <details>
-<summary><b>139. What is the balking pattern, and where would you use it?</b>  <sub>mid</sub></summary>
+<summary><b>145. What is the balking pattern, and where would you use it?</b>  <sub>mid</sub></summary>
 
 Balking is the "if you are already doing it, do nothing" pattern: check the state under the lock, and
 if the action is not appropriate right now, return at once rather than blocking.
@@ -2943,7 +3092,7 @@ caller would rather be delayed or told no.
 </details>
 
 <details>
-<summary><b>140. What is the double-checked locking antipattern really about?</b>  <sub>mid</sub></summary>
+<summary><b>146. What is the double-checked locking antipattern really about?</b>  <sub>mid</sub></summary>
 
 The idiom exists to avoid taking a lock on every read of a lazily initialised field. Without `volatile`
 it is broken, because another thread can see a published reference to a partially constructed object.
@@ -2960,7 +3109,7 @@ Interviewers ask this to see if you reach for the clever construct or for the si
 </details>
 
 <details>
-<summary><b>141. Why is "synchronize everything" a bad strategy?</b>  <sub>mid</sub></summary>
+<summary><b>147. Why is "synchronize everything" a bad strategy?</b>  <sub>mid</sub></summary>
 
 Locking everything converts a concurrent program into a sequential one with extra overhead, and the
 scaling curve goes flat or downwards as threads are added.
@@ -2977,7 +3126,7 @@ field (`@GuardedBy` is worth the annotation).
 </details>
 
 <details>
-<summary><b>142. What is the thread-per-task versus task-per-thread distinction, and why did pools exist?</b>  <sub>mid</sub></summary>
+<summary><b>148. What is the thread-per-task versus task-per-thread distinction, and why did pools exist?</b>  <sub>mid</sub></summary>
 
 `new Thread(task).start()` per request works until it does not: each one reserves a stack, each start
 is a syscall, and thousands of them thrash the scheduler. Pools decouple the unit of work (a task) from
@@ -2994,7 +3143,7 @@ longer costs anything.
 </details>
 
 <details>
-<summary><b>143. Why should you not start a thread from a constructor?</b>  <sub>senior</sub></summary>
+<summary><b>149. Why should you not start a thread from a constructor?</b>  <sub>senior</sub></summary>
 
 `new Thread(this).start()` inside a constructor publishes `this` before the object is finished. The
 new thread may see default values in fields the constructor is about to set, and the final-field
@@ -3010,7 +3159,7 @@ construction completes before the object is shared. This is the escape half of s
 </details>
 
 <details>
-<summary><b>144. When would you choose an object pool, and when is it the wrong answer?</b>  <sub>senior</sub></summary>
+<summary><b>150. When would you choose an object pool, and when is it the wrong answer?</b>  <sub>senior</sub></summary>
 
 Pooling made sense when allocation was expensive and collectors were slow. On a modern JVM, allocating
 a short-lived object costs a pointer bump and dying young is nearly free, so pooling ordinary objects
@@ -3028,7 +3177,7 @@ timeout on acquisition, and eviction of idle entries.
 </details>
 
 <details>
-<summary><b>145. What is the two-phase termination pattern?</b>  <sub>mid</sub></summary>
+<summary><b>151. What is the two-phase termination pattern?</b>  <sub>mid</sub></summary>
 
 The pattern separates "please stop" from "has stopped". The requester sets a `volatile` flag and
 interrupts the worker, so both a busy worker and a blocked one notice. The worker checks the flag at
@@ -3049,7 +3198,7 @@ which is what the `join` or the latch is for.
 </details>
 
 <details>
-<summary><b>146. How do you make a class document its own thread safety?</b>  <sub>mid</sub></summary>
+<summary><b>152. How do you make a class document its own thread safety?</b>  <sub>mid</sub></summary>
 
 A class is thread safe, conditionally thread safe, or not, and the reader cannot tell by looking. State
 it in one sentence at the top of the javadoc: "Thread safe. All mutable state is guarded by `lock`."
@@ -3084,7 +3233,7 @@ Runnable: [testing concurrency](https://github.com/alxkm/java-concurrency-patter
 ```
 
 <details>
-<summary><b>147. Why is `Thread.sleep` in a test a bug rather than a delay?</b>  <sub>mid</sub></summary>
+<summary><b>153. Why is `Thread.sleep` in a test a bug rather than a delay?</b>  <sub>mid</sub></summary>
 
 A sleep says "this will probably have happened by now". On a loaded CI machine it will not, and the
 test fails for reasons unrelated to the code. Lengthen it and every run pays the cost, so a suite of
@@ -3110,7 +3259,7 @@ static void await(Duration timeout, BooleanSupplier condition) throws Interrupte
 </details>
 
 <details>
-<summary><b>148. How do you write a test that actually creates contention?</b>  <sub>mid</sub></summary>
+<summary><b>154. How do you write a test that actually creates contention?</b>  <sub>mid</sub></summary>
 
 Threads started in a loop tend to run one after another, because starting a thread takes longer than
 the body of a small test. A `CyclicBarrier` or a `CountDownLatch` used as a starting gate lines them up
@@ -3138,7 +3287,7 @@ this catches lost updates but hides visibility bugs.
 </details>
 
 <details>
-<summary><b>149. Why can a unit test not reliably catch a visibility or reordering bug?</b>  <sub>senior</sub></summary>
+<summary><b>155. Why can a unit test not reliably catch a visibility or reordering bug?</b>  <sub>senior</sub></summary>
 
 To observe a reordering you need two threads executing a few instructions at precisely overlapping
 moments. Arranging that requires a latch or a barrier, and that construct emits fences and creates
@@ -3156,7 +3305,7 @@ job.
 </details>
 
 <details>
-<summary><b>150. What is jcstress and when do you reach for it?</b>  <sub>senior</sub></summary>
+<summary><b>156. What is jcstress and when do you reach for it?</b>  <sub>senior</sub></summary>
 
 jcstress writes the test for you in a shape ordinary code cannot: two `@Actor` methods run with no
 synchronisation between them, the harness repeats them for millions of samples, shuffles JIT decisions
@@ -3173,7 +3322,7 @@ source set that CI compiles but does not run on every build.
 </details>
 
 <details>
-<summary><b>151. How do you test that something is *not* possible, such as a deadlock?</b>  <sub>senior</sub></summary>
+<summary><b>157. How do you test that something is *not* possible, such as a deadlock?</b>  <sub>senior</sub></summary>
 
 A hang is the worst test outcome, because the build sits there until a job timeout kills it with no
 information. Make it a failure with evidence instead: `assertTimeoutPreemptively`, a bounded
@@ -3193,7 +3342,7 @@ proves the deadlock did not occur this time, not that the ordering is correct.
 </details>
 
 <details>
-<summary><b>152. What makes a concurrency test flaky, and how do you deal with flakiness?</b>  <sub>mid</sub></summary>
+<summary><b>158. What makes a concurrency test flaky, and how do you deal with flakiness?</b>  <sub>mid</sub></summary>
 
 The usual causes are all fixable: sleeps standing in for conditions, assertions on how long something
 took, shared static state or singletons leaking across tests, ports and temp files that collide, and
@@ -3209,7 +3358,7 @@ the test, and run the suite occasionally with more threads than cores to change 
 </details>
 
 <details>
-<summary><b>153. How would you benchmark two concurrent implementations honestly?</b>  <sub>senior</sub></summary>
+<summary><b>159. How would you benchmark two concurrent implementations honestly?</b>  <sub>senior</sub></summary>
 
 A hand-rolled timing loop measures the interpreter, then the C1 compiler, then dead code the JIT
 removed because the result was unused. JMH exists to remove those: warmup iterations, blackholes for
@@ -3225,7 +3374,7 @@ repository's README turned out to be wrong once measured, which is why they now 
 </details>
 
 <details>
-<summary><b>154. Can you unit test code that uses the current time or a scheduler?</b>  <sub>mid</sub></summary>
+<summary><b>160. Can you unit test code that uses the current time or a scheduler?</b>  <sub>mid</sub></summary>
 
 Hard-coded `System.currentTimeMillis()` and a privately constructed `ScheduledExecutorService` are
 what make a class untestable. Inject both and the tests become ordinary:
@@ -3241,7 +3390,7 @@ its own threads, nobody can control them.
 </details>
 
 <details>
-<summary><b>155. What static analysis helps with concurrency?</b>  <sub>mid</sub></summary>
+<summary><b>161. What static analysis helps with concurrency?</b>  <sub>mid</sub></summary>
 
 The compiler says nothing about thread safety, but analysers catch a real subset. SpotBugs has a
 concurrency category: inconsistent synchronisation (a field synchronised on 90% of accesses),
@@ -3256,7 +3405,7 @@ before it reaches review.
 </details>
 
 <details>
-<summary><b>156. What would you add to a code review checklist for concurrent code?</b>  <sub>senior</sub></summary>
+<summary><b>162. What would you add to a code review checklist for concurrent code?</b>  <sub>senior</sub></summary>
 
 A checklist that finds real bugs:
 
@@ -3271,6 +3420,28 @@ A checklist that finds real bugs:
 - Do the tests bound their waits, and is the thread safety policy written in the javadoc?
 
 Offering this list unprompted is usually a stronger signal than any single technical answer.
+
+</details>
+
+<details>
+<summary><b>163. What is the difference between `assertTimeout` and `assertTimeoutPreemptively` in JUnit 5?</b>  <sub>junior</sub></summary>
+
+`assertTimeout` runs the code on the test's own thread, lets it finish, and only then compares the
+time taken with the limit. That is fine for "this should be fast", and useless for "this might
+deadlock": a deadlocked call never returns, so the assertion never runs and the build hangs until
+CI kills it, with no message.
+
+`assertTimeoutPreemptively` runs the code on a separate thread and stops waiting at the deadline, so
+the test fails on time and says why. Two costs come with the other thread:
+
+- The stuck thread is interrupted, and a thread blocked on `synchronized` ignores that, so it stays
+  behind for the rest of the run. Harmless for one failing test, worth knowing when many fail.
+- Anything bound to the test thread through a `ThreadLocal` is missing there. Spring's test-managed
+  transaction and security context are the usual surprises.
+
+The annotation form is `@Timeout`, with `threadMode = SEPARATE_THREAD` for the preemptive behaviour,
+and `junit.jupiter.execution.timeout.default` sets a limit for every test, which is a cheap safety
+net for a concurrency-heavy suite.
 
 </details>
 
@@ -3293,7 +3464,7 @@ Runnable: [odd/even printer](https://github.com/alxkm/java-concurrency-patterns/
 ```
 
 <details>
-<summary><b>157. Print numbers 1 to 100 with two threads, one printing odd and one even, in order.</b>  <sub>mid</sub></summary>
+<summary><b>164. Print numbers 1 to 100 with two threads, one printing odd and one even, in order.</b>  <sub>mid</sub></summary>
 
 The shape they want, with the `while` loop and the `notifyAll` in the right places:
 
@@ -3329,12 +3500,16 @@ permit after printing.
 </details>
 
 <details>
-<summary><b>158. Implement a bounded blocking queue with `wait` and `notify`.</b>  <sub>mid</sub></summary>
+<summary><b>165. Implement a bounded blocking queue with `wait` and `notify`.</b>  <sub>mid</sub></summary>
 
 ```java
 class BoundedQueue<T> {
     private final Queue<T> items = new ArrayDeque<>();
     private final int capacity;
+
+    BoundedQueue(int capacity) {
+        this.capacity = capacity;
+    }
 
     synchronized void put(T item) throws InterruptedException {
         while (items.size() == capacity) {
@@ -3363,7 +3538,7 @@ The better version uses a `ReentrantLock` with two `Condition`s, `notFull` and `
 </details>
 
 <details>
-<summary><b>159. Make three tasks run concurrently but print their results in a fixed order.</b>  <sub>mid</sub></summary>
+<summary><b>166. Make three tasks run concurrently but print their results in a fixed order.</b>  <sub>mid</sub></summary>
 
 Two good answers, and picking the right one depends on whether the printing itself must be ordered or
 only the final output.
@@ -3378,7 +3553,7 @@ avoid is a shared `volatile int turn` with a spin loop, which burns a core to sa
 </details>
 
 <details>
-<summary><b>160. Implement a rate limiter that allows N operations per second.</b>  <sub>senior</sub></summary>
+<summary><b>167. Implement a rate limiter that allows N operations per second.</b>  <sub>senior</sub></summary>
 
 The simplest correct version is a `Semaphore` with N permits and a scheduled refill:
 
@@ -3404,7 +3579,7 @@ the resource is, not per JVM.
 </details>
 
 <details>
-<summary><b>161. Solve the dining philosophers problem without deadlock.</b>  <sub>mid</sub></summary>
+<summary><b>168. Solve the dining philosophers problem without deadlock.</b>  <sub>mid</sub></summary>
 
 Five philosophers, five forks, everyone grabbing left then right: a perfect circular wait. The three
 standard fixes, each breaking a different Coffman condition:
@@ -3422,7 +3597,7 @@ Say which you would ship: ordering, because it is deterministic and has no retry
 </details>
 
 <details>
-<summary><b>162. Write a thread-safe lazily initialised cache where each key is computed once.</b>  <sub>senior</sub></summary>
+<summary><b>169. Write a thread-safe lazily initialised cache where each key is computed once.</b>  <sub>senior</sub></summary>
 
 `computeIfAbsent` is the one-liner and the right first answer:
 
@@ -3457,7 +3632,7 @@ cached an exception forever.
 </details>
 
 <details>
-<summary><b>163. Implement a simple `CountDownLatch` yourself.</b>  <sub>senior</sub></summary>
+<summary><b>170. Implement a simple `CountDownLatch` yourself.</b>  <sub>senior</sub></summary>
 
 ```java
 class Latch {
@@ -3490,7 +3665,7 @@ The real one is an AQS subclass using the state as the count, which is worth nam
 </details>
 
 <details>
-<summary><b>164. Write a non-blocking stack.</b>  <sub>senior</sub></summary>
+<summary><b>171. Write a non-blocking stack.</b>  <sub>senior</sub></summary>
 
 ```java
 class Stack<T> {
@@ -3528,7 +3703,7 @@ collector this is the textbook ABA hazard, which is why C++ needs hazard pointer
 </details>
 
 <details>
-<summary><b>165. Run a task exactly once no matter how many threads call it.</b>  <sub>mid</sub></summary>
+<summary><b>172. Run a task exactly once no matter how many threads call it.</b>  <sub>mid</sub></summary>
 
 ```java
 private final AtomicBoolean started = new AtomicBoolean();
@@ -3550,7 +3725,7 @@ If they must wait for it, add a `CountDownLatch` the winner counts down and ever
 </details>
 
 <details>
-<summary><b>166. Two threads, one increments and one prints a shared counter. What could go wrong, and how do you fix it by hand?</b>  <sub>junior</sub></summary>
+<summary><b>173. Two threads, one increments and one prints a shared counter. What could go wrong, and how do you fix it by hand?</b>  <sub>junior</sub></summary>
 
 Two separate bugs live in this three-line program, and naming both is the test.
 

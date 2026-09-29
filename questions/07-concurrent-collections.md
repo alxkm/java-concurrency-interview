@@ -244,3 +244,30 @@ In that case a `HashMap` guarded by a `ReentrantLock` you hold across the whole 
 simpler and more correct, and the honest answer in an interview. The follow-up is usually about scope:
 keep the lock as narrow as the invariant, and never call unknown code (a listener, a callback) while
 holding it.
+
+## Many threads count words into one map. How do you make the counting correct?
+- id: concurrent-word-count
+- level: junior
+- tags: concurrenthashmap, merge, atomicity
+
+* [ ] A `HashMap`, with `get` and then `put`
+* [ ] A `ConcurrentHashMap`, with `get` and then `put`, since each call is thread safe
+* [x] `ConcurrentHashMap.merge(word, 1L, Long::sum)`, which updates one key atomically
+* [ ] `Collections.synchronizedMap`, with `get` and then `put`
+
+Every call on a `ConcurrentHashMap` is thread safe, but two calls in a row are not one operation.
+With `get` then `put`, two threads read the same count, both add one, and one increment is lost. The
+map is fine; the read-modify-write around it is the race. A synchronized wrapper has exactly the same
+hole, because it locks each call, not the pair.
+
+The fix is to hand the whole update to the map, which runs it atomically for that key:
+
+```java
+ConcurrentHashMap<String, Long> counts = new ConcurrentHashMap<>();
+counts.merge(word, 1L, Long::sum);
+```
+
+`compute` and `computeIfAbsent` give the same per-key guarantee. When one key is very hot, the
+threads queue on that key's bin, and the usual next step is a `LongAdder` per key:
+`counts.computeIfAbsent(word, k -> new LongAdder()).increment()`. The map lookup is then read-only for
+existing words, and the increment spreads over cells.

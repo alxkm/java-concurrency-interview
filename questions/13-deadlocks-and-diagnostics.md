@@ -251,3 +251,32 @@ race rather than a logic error. The productive order:
    quarterly one that is far harder to find.
 
 Saying "a retry makes it rarer, not absent" is usually what the interviewer is listening for.
+
+## What is a deadlock, and why does it not resolve itself?
+- id: deadlock-basics
+- level: junior
+- tags: deadlock, basics
+
+* [ ] Two threads competing for the CPU until one of them gives up
+* [x] Each thread waits for a lock another one holds, and nothing times out, so they wait forever
+* [ ] A thread stuck in an infinite loop
+* [ ] Any thread that is in the `BLOCKED` state
+
+The smallest example is two threads taking the same two locks in opposite order:
+
+```java
+Object a = new Object(), b = new Object();
+new Thread(() -> { synchronized (a) { pause(); synchronized (b) { } } }).start();
+new Thread(() -> { synchronized (b) { pause(); synchronized (a) { } } }).start();
+```
+
+Each holds one lock and waits for the other. `synchronized` has no timeout and cannot be interrupted,
+and the JVM does not break deadlocks. A database picks a victim and rolls it back; the JVM just
+leaves both threads blocked, forever, with zero CPU.
+
+That is also how it looks from outside: the service stops answering but is not busy. A thread dump
+(`jstack <pid>`) says it directly, with a section titled "Found one Java-level deadlock" that names
+the threads and the locks.
+
+The fixes follow from the example: always take locks in one global order, hold as few as possible at
+once, or use `ReentrantLock.tryLock` with a timeout so a thread can back off instead of waiting forever.

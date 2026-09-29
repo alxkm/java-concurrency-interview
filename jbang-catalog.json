@@ -1,0 +1,9 @@
+{
+  "aliases": {
+    "quiz": {
+      "script-ref": "https://github.com/alxkm/java-concurrency-interview/releases/latest/download/java-concurrency-interview.jar",
+      "description": "Java concurrency interview quiz: mock interviews, flashcards and a review of your misses",
+      "java": "21+"
+    }
+  }
+}

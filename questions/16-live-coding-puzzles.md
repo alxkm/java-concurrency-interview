@@ -70,6 +70,10 @@ class BoundedQueue<T> {
     private final Queue<T> items = new ArrayDeque<>();
     private final int capacity;
 
+    BoundedQueue(int capacity) {
+        this.capacity = capacity;
+    }
+
     synchronized void put(T item) throws InterruptedException {
         while (items.size() == capacity) {
             wait();
