@@ -1143,13 +1143,19 @@ public final class Quiz {
      * marker comment would break the paragraph, so it is matched by pattern instead.
      */
     static String render(String readme, Bank bank) {
-        String body = replaceBetween(readme, BEGIN_SCREEN, END_SCREEN, screen(bank));
+        // Git for Windows checks text out with CRLF by default, and everything generated here is
+        // built with LF. Work in LF and hand the file back in the line endings it arrived with, or a
+        // fresh Windows clone reports the README as out of date before anyone has touched it.
+        String eol = readme.contains("\r\n") ? "\r\n" : "\n";
+        String body = replaceBetween(readme.replace("\r\n", "\n"), BEGIN_SCREEN, END_SCREEN,
+                screen(bank));
         body = replaceBetween(body, BEGIN, END, catalogue(bank));
         int count = bank.questions().size();
-        return body
+        body = body
                 .replaceAll("badge/questions-\\d+-", "badge/questions-" + count + "-")
                 .replaceAll("(?m)^\\d+ interview questions on Java concurrency",
                         count + " interview questions on Java concurrency");
+        return eol.equals("\n") ? body : body.replace("\n", eol);
     }
 
     private static String replaceBetween(String text, String begin, String end, String generated) {
