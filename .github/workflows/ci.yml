@@ -46,7 +46,7 @@ jobs:
         run: echo q | java src/main/java/org/alxkm/interview/Quiz.java --no-color
 
       - name: Upload test report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: test-report-java-${{ matrix.java }}
