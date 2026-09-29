@@ -215,6 +215,20 @@ class QuizTest {
         }
 
         @Test
+        @DisplayName("lives next to a checkout, and in the home directory when run from the jar")
+        void location(@TempDir Path dir) throws IOException {
+            Path checkout = Files.createDirectories(dir.resolve("repo/questions"));
+            assertEquals(dir.resolve("repo/.progress").toAbsolutePath(), Quiz.progressFile(checkout));
+
+            Path jar = dir.resolve("quiz.jar");
+            try (var zip = java.nio.file.FileSystems.newFileSystem(jar, java.util.Map.of("create", "true"))) {
+                Path bundled = Files.createDirectories(zip.getPath("/questions"));
+                Path progress = Quiz.progressFile(bundled);
+                assertEquals(Path.of(System.getProperty("user.home")), progress.getParent());
+            }
+        }
+
+        @Test
         @DisplayName("a corrupted file starts fresh instead of crashing the quiz")
         void corruptFile(@TempDir Path dir) throws IOException {
             Path file = dir.resolve(".progress");
