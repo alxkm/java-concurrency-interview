@@ -255,3 +255,63 @@ depth, rejected task count, and the 99th percentile of both. HikariCP exposes al
 Two failure modes to name. A connection held across a remote call multiplies its hold time by the
 slowest dependency. And a thread that borrows two connections at once, typically a nested transaction,
 can deadlock the pool entirely when enough threads hold one and wait for another.
+
+## Why can one slow `@Scheduled` job delay every other scheduled job in a Spring app?
+- id: spring-scheduled-single-thread
+- level: mid
+- tags: spring, scheduling, executors
+
+* [ ] Spring deliberately runs scheduled jobs one at a time, to prevent races
+* [x] The default scheduler has a single thread, so a long job holds up every job due meanwhile
+* [ ] Each job has its own thread, but they all share one lock
+* [ ] The JVM allows only one scheduled task per core
+
+Without configuration, Spring Framework schedules on a single-threaded executor, and Spring Boot's
+auto-configured `ThreadPoolTaskScheduler` has `spring.task.scheduling.pool.size=1`. Every
+`@Scheduled` method in the application shares that one thread. A report that takes ten minutes means
+the cache refresh due every minute runs ten minutes late, and nothing in the logs says so.
+
+The fixes, depending on what the jobs are:
+
+- Raise `spring.task.scheduling.pool.size`, or define your own `TaskScheduler` bean.
+- Keep the scheduled method short and hand the heavy work to a dedicated executor.
+- On Boot 3.2 and later, `spring.threads.virtual.enabled=true` switches scheduling to a virtual
+  thread per run.
+
+Two related facts come up in the follow-up. A single job never overlaps itself: with `fixedRate`, a
+run that overruns makes the next one start late, not concurrently. And an exception is logged and the
+schedule continues, unlike a raw `ScheduledExecutorService`, where one exception silently cancels
+every future run. Finally, with several instances of the service, each one runs the job; making it
+run once per cluster needs a lock outside the JVM, such as ShedLock.
+
+## `KafkaConsumer` is not thread safe. How do you process its records in parallel?
+- id: kafka-consumer-threads
+- level: senior
+- tags: kafka, executors, ordering
+
+* [ ] Share one consumer across a thread pool and synchronize every call on it
+* [ ] Call `poll()` from many threads, since each call returns different records
+* [x] One consumer per thread, up to the partition count, or one poller feeding workers and committing only finished work
+* [ ] Turn on auto-commit and process each batch with a parallel stream
+
+A `KafkaConsumer` refuses to be used from two threads at once and throws
+`ConcurrentModificationException` when it is. The only method safe to call from another thread is
+`wakeup()`, which exists to break a blocked `poll()` during shutdown. So there are two shapes:
+
+**One consumer per thread.** Each consumer in the group owns some partitions and processes them in
+order. It is simple and keeps per-partition ordering, but parallelism is capped by the number of
+partitions: the eleventh consumer on a ten-partition topic sits idle. Spring Kafka's `concurrency`
+setting is exactly this.
+
+**One poller, many workers.** A single thread polls and hands records to a pool. Parallelism is no
+longer tied to partitions, but three things become your job:
+
+- **Commits.** Commit an offset only when everything before it in that partition has finished, or a
+  crash skips records. Auto-commit here commits work that never ran.
+- **Liveness.** Keep calling `poll()`; if the gap exceeds `max.poll.interval.ms`, the group decides
+  the consumer is dead and rebalances. Use `pause()` and `resume()` for backpressure instead.
+- **Ordering.** Records for one key must go to the same worker if order matters, for example by
+  hashing the key onto a fixed set of single-threaded executors.
+
+Libraries such as Confluent's parallel consumer package the second shape with per-key ordering, and
+knowing that they exist is part of a senior answer.

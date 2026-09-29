@@ -249,3 +249,29 @@ pool may compensate by starting an extra thread. `ConcurrentHashMap.computeIfAbs
 
 The better answer in 2026 is that blocking work belongs on virtual threads or a dedicated pool, and
 fork/join should keep to what it was built for.
+
+## What does `parallelStream()` change compared with `stream()`?
+- id: parallel-stream-basics
+- level: junior
+- tags: parallel-streams, common-pool
+
+* [ ] Every element is processed on a thread of its own
+* [x] The source is split into chunks that run on the common `ForkJoinPool`, the caller helping
+* [ ] The pipeline runs in order, just on one background thread
+* [ ] Nothing, unless the source is a concurrent collection
+
+The pipeline is the same; the execution is not. The source is split by its `Spliterator`, the
+chunks run as fork/join tasks in `ForkJoinPool.commonPool()`, and the calling thread joins in rather
+than waiting idle. The common pool has one thread fewer than there are cores, so with the caller the
+work uses every core.
+
+Three consequences are what the interviewer is after:
+
+- **Order is not guaranteed** for `forEach`. Use `forEachOrdered`, or better, a collector.
+- **Side effects break.** Adding to a shared `ArrayList` from `forEach` loses elements or throws.
+  `collect(toList())` is correct in parallel because each chunk builds its own list and they are merged.
+- **It is not automatically faster.** Splitting and merging cost something, so a few thousand cheap
+  operations usually run slower in parallel. Measure first.
+
+And the one that bites in production: every parallel stream in the JVM shares that one common pool,
+so a slow or blocking operation in one of them slows down all the others.
