@@ -222,7 +222,9 @@ Two correct endings. Propagate it, if your signature allows, and let the caller 
 cannot, restore the flag before returning:
 
 ```java
-catch (InterruptedException e) {
+try {
+    task = queue.take();
+} catch (InterruptedException e) {
     Thread.currentThread().interrupt();   // the next blocking call will see it
     return;                               // and stop doing work
 }
@@ -3335,6 +3337,10 @@ permit after printing.
 class BoundedQueue<T> {
     private final Queue<T> items = new ArrayDeque<>();
     private final int capacity;
+
+    BoundedQueue(int capacity) {
+        this.capacity = capacity;
+    }
 
     synchronized void put(T item) throws InterruptedException {
         while (items.size() == capacity) {
