@@ -26,16 +26,16 @@ jobs:
         java: [ '21', '25' ]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: ${{ matrix.java }}
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Build and check the question content
         run: ./gradlew build --no-daemon
@@ -46,7 +46,7 @@ jobs:
         run: echo q | java src/main/java/org/alxkm/interview/Quiz.java --no-color
 
       - name: Upload test report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: test-report-java-${{ matrix.java }}
