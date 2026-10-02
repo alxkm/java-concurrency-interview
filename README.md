@@ -1,4 +1,6 @@
-# Java Concurrency Interview
+<p align="center">
+  <img src="docs/banner.svg" alt="Java Concurrency Interview: two threads, each holding one lock and waiting for the other's" width="100%">
+</p>
 
 [![build](https://github.com/alxkm/java-concurrency-interview/actions/workflows/ci.yml/badge.svg)](https://github.com/alxkm/java-concurrency-interview/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
