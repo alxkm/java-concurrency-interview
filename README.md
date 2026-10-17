@@ -536,10 +536,10 @@ reason `AtomicLong` exists as a type rather than as a convenience wrapper.
 writing 42 lose an increment. Run it and you will typically get something like 1.3 million, and the
 number changes every run.
 
-Interviewers usually follow up with "what is the theoretical minimum?" The answer is 2, or even 1 if
-you allow a single thread to finish before the other starts: one thread can read a stale value, be
-descheduled for the whole run, and write its own stale result at the end, discarding a million
-updates in one store.
+Interviewers usually follow up with "what is the theoretical minimum?" The answer is 2, not 1. Thread A reads 0 and is
+descheduled. B runs all but its last increment. A writes 1. B reads that 1 for its last increment and
+is descheduled. A runs the rest of its loop. B writes 2, last. It cannot go lower, because each
+thread's own writes happen-before its later reads, so its final read can never see the initial 0.
 
 Three fixes with different costs: `synchronized` (correct, contended, about 18 ops/us at 8 threads),
 `AtomicInteger` (a CAS loop, about 115), `LongAdder` (striped cells, about 1256, at the cost of a
@@ -767,7 +767,8 @@ else, the queueing, parking, unparking and cancellation, is inherited.
 
 `ReentrantLock` uses state as a hold count. `Semaphore` uses it as a permit count. `CountDownLatch`
 uses it as the remaining count and never lets it go back up. `ReentrantReadWriteLock` packs readers
-and writers into two halves of the same int. `FutureTask` and `ThreadPoolExecutor.Worker` use it too.
+and writers into two halves of the same int. `ThreadPoolExecutor.Worker` uses it too, as a small non-reentrant lock. `FutureTask` did until Java 7,
+and has used its own state field and stack of waiters since.
 
 Note that `synchronized` is not on the list: monitors are implemented in the JVM, not in Java, which is
 why a thread waiting on a `ReentrantLock` appears as WAITING at `LockSupport.park` rather than as
@@ -903,8 +904,9 @@ and helps the sibling hyperthread.
 <summary><b>40. Can a thread deadlock against itself?</b>  <sub>mid</sub></summary>
 
 `synchronized` and `ReentrantLock` are reentrant, so recursion is fine there. `StampedLock` is not
-reentrant at all, and reacquiring any of its locks on the same thread parks that thread forever with no
-owner ever coming to release it.
+reentrant: asking for its write lock while already holding the write lock or a read lock parks the
+thread forever, because the owner it waits for is itself. A second read lock usually succeeds, since
+reads are shared, but it can still hang if a writer has queued in between.
 
 The subtler case is lock upgrade. Holding a read lock and asking for the write lock waits for all
 readers to leave, including the caller, which never will. Downgrading is legal and supported: take the
@@ -1106,8 +1108,8 @@ completes exceptionally if any input fails. Nothing blocks unless you ask it to.
 
 A latch still wins in two places: coordinating threads you did not start as futures, such as a starting
 gate in a test, and simple lifecycle signalling ("the server is up"). Structured concurrency covers
-the fan-out case with cancellation on top, which is the answer to the follow-up about what you would
-use on Java 21 and newer.
+the fan-out case with cancellation on top, which is the answer to the follow-up about where this is
+heading, with the caveat that it is still a preview API as of Java 25.
 
 </details>
 
@@ -1201,8 +1203,11 @@ CAS takes an address, the value you expect to find and the value you want to ins
 swap atomically only if the expectation holds. On x86 it is `lock cmpxchg`; on ARM it is a
 load-linked / store-conditional pair. It returns whether it succeeded.
 
-`incrementAndGet` reads the current value, computes value plus one, and calls `compareAndSet`. If
-another thread got in first, the CAS fails and the whole thing is retried with the new value. No lock
+Conceptually, `incrementAndGet` reads the current value, computes value plus one, and calls
+`compareAndSet`. If another thread got in first, the CAS fails and the whole thing is retried with the
+new value. That loop is what `updateAndGet` still does, and what `getAndAddInt` falls back to. On x86,
+HotSpot replaces the plain increment with a single `lock xadd`, which cannot fail, so the retry only
+exists where the hardware has no fetch-and-add. No lock
 is ever taken and no thread is ever parked, which is why a failing thread does not block anyone else.
 
 The consequence to state in an interview: CAS is lock-free, not wait-free. The system always makes
@@ -1287,7 +1292,11 @@ The atomic classes are thin wrappers. Since Java 9 the supported way to do it yo
 private volatile long value;
 private static final VarHandle VALUE;
 static {
-    VALUE = MethodHandles.lookup().findVarHandle(Counter.class, "value", long.class);
+    try {
+        VALUE = MethodHandles.lookup().findVarHandle(Counter.class, "value", long.class);
+    } catch (ReflectiveOperationException e) {
+        throw new ExceptionInInitializerError(e);
+    }
 }
 
 void increment() {
@@ -1315,6 +1324,10 @@ intervening interrupt, and forcing a retry in hardware costs more than letting t
 It is only correct inside a loop that would retry anyway. Using it for a one-shot "set this flag if it
 is still null" is a bug, because a spurious failure is indistinguishable from a real one. On x86 the
 two compile to the same instruction, which is why testing on x86 proves nothing here.
+
+One naming trap: on the atomic classes, the method called `weakCompareAndSet` has been deprecated since
+Java 9, because the name never said which memory ordering it had. Use `weakCompareAndSetPlain` or
+`weakCompareAndSetVolatile`, which do.
 
 </details>
 
@@ -1514,7 +1527,7 @@ probabilistic balanced structure that can be updated with CAS rather than the ro
 tree would need under a lock.
 
 The trade-off is the usual one: O(log n) instead of O(1) and worse constants, so do not use it as a
-general-purpose map. Its `size()` is also O(n), because there is no counter to read.
+general-purpose map. Since Java 9 its `size()` reads a `LongAdder`, so it is cheap; on Java 8 it walked the whole list.
 
 </details>
 
@@ -1525,7 +1538,7 @@ general-purpose map. Its `size()` is also O(n), because there is no counter to r
 waits and gets the same value, with no double computation and no check-then-act race.
 
 The trap is what runs under the bin lock. If the mapping function updates the same map, you can get an
-`IllegalStateException` ("recursive update") or, in the pre-Java-9 versions, a corrupted table. If it
+`IllegalStateException` ("recursive update") or, on Java 8, a thread that spins forever inside the call (JDK-8062841). If it
 is slow (an I/O call, a remote lookup), every other writer that hashes to the same bin is blocked for
 its whole duration, and if two threads compute entries that recursively depend on each other, they
 deadlock.
@@ -1812,8 +1825,9 @@ try {
 }
 ```
 
-In Java 21, `ScopedValue` is the intended replacement: immutable, bounded to a scope, and inherited by
-structured concurrency forks without any of this.
+`ScopedValue` is the intended replacement: immutable, bounded to a scope, and inherited by
+structured concurrency forks without any of this. It was a preview API from Java 21 and is final since
+Java 25 (JEP 506); structured concurrency is still a preview there.
 
 </details>
 
@@ -1825,8 +1839,9 @@ work-stealing pool each worker owns a double-ended queue. It pushes and pops fro
 which keeps the freshest and most cache-warm task), and an idle worker steals from the opposite end
 (FIFO, taking the oldest and typically largest piece of work).
 
-`ForkJoinPool`, the common pool behind parallel streams, `Executors.newWorkStealingPool` and the
-virtual thread scheduler all work this way. It shines for recursive divide-and-conquer where tasks
+`ForkJoinPool` and the common pool behind parallel streams work this way. `Executors.newWorkStealingPool`
+and the virtual thread scheduler steal the same way but run their own queue FIFO (`asyncMode`), which
+suits event-style tasks that are never joined. It shines for recursive divide-and-conquer where tasks
 spawn subtasks; it buys little for uniform, independent, blocking tasks, where a plain pool is simpler
 and just as fast.
 
@@ -1926,7 +1941,9 @@ those inside libraries you did not write. Block on I/O there and you have taken 
 resource out of circulation.
 
 There is a further trap: on a single-core machine, or in a container that reports one CPU, the common
-pool has zero threads and runs everything on the caller, so your "async" code is fully synchronous.
+pool has a parallelism of 1, and `CompletableFuture` refuses a pool that small: every `*Async` call
+without an executor starts a brand-new thread instead. Nothing bounds that, so a burst of calls becomes
+a burst of threads.
 
 Pass an executor sized for the work: a bounded pool for blocking calls, and ideally a separate one per
 downstream dependency so a slow service cannot take the others with it.
@@ -2108,7 +2125,7 @@ and `CompletableFuture`'s async methods use it when you do not pass an executor.
 
 So a single parallel stream doing blocking I/O occupies a scarce global resource, and every other
 parallel operation in the process slows down or stalls. On a machine reporting one CPU, the common pool
-has zero threads and everything runs on the caller.
+has a single worker, so a parallel stream gets that one thread plus the caller.
 
 You can raise its size with `-Djava.util.concurrent.ForkJoinPool.common.parallelism=N`, which is a
 blunt global setting, or run the stream inside your own `ForkJoinPool` by submitting it there, which
@@ -2179,8 +2196,9 @@ task tree.
 
 Its characteristics (`SIZED`, `SUBSIZED`, `ORDERED`, `DISTINCT`, `SORTED`, `IMMUTABLE`, `NONNULL`) are
 what the pipeline optimises against. An array spliterator is `SIZED` and `SUBSIZED`, so splits are
-exact and free. A linked list's is neither: `trySplit` has to walk the nodes to buffer a prefix, and the
-split is uneven.
+exact and free. A linked list's reports the same flags, but
+its `trySplit` has to walk the nodes and copy a batch into an array, and the batches start small and
+grow, so every split costs a traversal and the halves are uneven.
 
 If you write a custom data source and want parallel streams over it to be worth anything, implementing
 `trySplit` and reporting accurate characteristics is the work. The default from
@@ -2233,8 +2251,8 @@ thread, and the work it would have stolen goes undone. Block all of them and the
 CPU sits idle.
 
 `ForkJoinPool.ManagedBlocker` is the official escape. It tells the pool "I am about to block", and the
-pool may compensate by starting an extra thread. `ConcurrentHashMap.computeIfAbsent` and the
-`CompletableFuture` join paths use it internally.
+pool may compensate by starting an extra thread. `CompletableFuture`'s `join` and `get` use it
+internally.
 
 The better answer in 2026 is that blocking work belongs on virtual threads or a dedicated pool, and
 fork/join should keep to what it was built for.
@@ -2311,7 +2329,8 @@ Measured on Java 21, a `synchronized` block around a blocking call cost about 6x
 the same code with a `ReentrantLock`. Native frames (JNI) pin as well and cannot be fixed by swapping a
 lock.
 
-Diagnosis: `-Djdk.tracePinnedThreads=full`, or the `jdk.VirtualThreadPinned` JFR event. The fix before
+Diagnosis: the `jdk.VirtualThreadPinned` JFR event, or `-Djdk.tracePinnedThreads=full` before JDK 24,
+which removed that flag. The fix before
 JDK 24 is to replace `synchronized` around blocking calls with `ReentrantLock`. JEP 491 in JDK 24
 removed most monitor pinning, so on newer JVMs this is largely historical, but the question is still
 asked and the JFR event is still the way to check.
@@ -2380,7 +2399,8 @@ try (var scope = StructuredTaskScope.open()) {      // JDK 25 API shape
 }   // on any exit path, both forks are finished or cancelled
 ```
 
-The API is still evolving (preview across JDK 19 to 24, and the factory-based shape from JDK 25), so
+The API is still evolving (incubating in JDK 19 and 20, a preview from JDK 21, and still a preview in the factory-based shape
+of JDK 25), so
 name the concept confidently and the exact signature with a caveat.
 
 </details>
@@ -2445,7 +2465,7 @@ I/O in a monitor (plenty of older JDBC drivers and HTTP clients did) will pin ev
 calls it, and the application's throughput collapses in a way that points at the wrong place.
 
 The guidance for that era: audit your own blocking paths, replace monitors around them with
-`ReentrantLock`, and check dependencies with `-Djdk.tracePinnedThreads=full`.
+`ReentrantLock`, and check dependencies with `-Djdk.tracePinnedThreads=full`, a flag JDK 24 removed along with the problem.
 
 JDK 24's JEP 491 made monitors unmount properly, which retires most of this. Give both halves in an
 interview: the mechanism, and the version where it stopped mattering, because the answer depends
@@ -2462,7 +2482,7 @@ resources. That is the standard demonstration: start a million threads that each
 watch it finish in about a second.
 
 The same retrofit covers `java.net` sockets, `NIO` channels, `java.util.concurrent` locks and queues,
-`Object.wait` and `Process.waitFor`. What is not covered: `synchronized` on older JVMs, native calls,
+and `Process.waitFor`. What is not covered: `synchronized` and `Object.wait` before JDK 24, native calls,
 and file I/O on some platforms, where the JVM falls back to a platform thread underneath.
 
 Sleeping as a way to coordinate threads remains a bad idea, but for reasons of correctness rather than
@@ -2657,8 +2677,9 @@ have no trace id.
 
 The mechanisms, in increasing order of tidiness: capture the values before the handoff and restore them
 inside the task, usually via a decorator that wraps every `Runnable`; use the framework's own bridge
-(`TaskDecorator`, `ContextSnapshot` from Micrometer Context Propagation, Reactor's `Context`); or, on
-Java 21 and newer, use `ScopedValue`, which is inherited by structured concurrency forks by design.
+(`TaskDecorator`, `ContextSnapshot` from Micrometer Context Propagation, Reactor's `Context`); or use
+`ScopedValue`, final since Java 25 and a preview before that, which structured concurrency forks
+inherit by design.
 
 Whatever you use, the matching `finally` that clears the value belongs there too. Pooled threads keep
 whatever you leave behind, and leaked context is worse than missing context: the next request logs
@@ -2842,8 +2863,10 @@ threads, the locks each holds and the lock each wants.
 Two caveats worth raising, because they are what the follow-up question is about. Deadlock detection
 covers monitors and, since Java 6, `java.util.concurrent` locks that implement `AbstractOwnableSynchronizer`,
 but not a `Semaphore` misuse or a latch nobody counts down, which is a hang without a cycle. And a
-thread waiting on a `ReentrantLock` shows as WAITING at `LockSupport.park`, not BLOCKED, so the
-ownership line (`- parking to wait for <0x...> owned by "worker-3"`) is what you look for.
+thread waiting on a `ReentrantLock` shows as WAITING at `LockSupport.park`, not BLOCKED, and its
+frame only says `- parking to wait for <0x...> (a java.util.concurrent.locks.ReentrantLock$NonfairSync)`.
+To find the owner, take the dump with `jstack -l` (or `jcmd <pid> Thread.print -l`) and look for that
+address under another thread's "Locked ownable synchronizers".
 
 Take three dumps a few seconds apart. One dump shows where threads are; three show whether they are
 moving.
@@ -3312,7 +3335,7 @@ job.
 jcstress writes the test for you in a shape ordinary code cannot: two `@Actor` methods run with no
 synchronisation between them, the harness repeats them for millions of samples, shuffles JIT decisions
 between forks, and records the frequency of every observed result. Outcomes are labelled `ACCEPTABLE`,
-`INTERESTING` or `FORBIDDEN`, so the test fails if a guarantee is ever violated.
+`ACCEPTABLE_INTERESTING` or `FORBIDDEN`, so the test fails if a guarantee is ever violated.
 
 Use it to answer questions of the form "can this be observed at all": does this idiom need `volatile`,
 is this publication safe, can this field be seen at its default. Its output is also the most persuasive
@@ -3584,14 +3607,15 @@ the resource is, not per JVM.
 <summary><b>168. Solve the dining philosophers problem without deadlock.</b>  <sub>mid</sub></summary>
 
 Five philosophers, five forks, everyone grabbing left then right: a perfect circular wait. The three
-standard fixes, each breaking a different Coffman condition:
+standard fixes, and the Coffman condition each one breaks:
 
 1. **Lock ordering**: number the forks and always take the lower-numbered one first. The last
    philosopher then reaches right-then-left, which breaks the cycle. One line of change.
 2. **A waiter**: a `Semaphore` with four permits, so at most four philosophers sit down and someone can
-   always eat. Breaks hold-and-wait.
+   always eat. With one seat empty the cycle can never close, so this breaks circular wait, like
+   ordering, without numbering anything.
 3. **tryLock with backoff**: take the first fork, `tryLock` the second, and put the first down if it
-   fails, retrying after a random delay. Breaks hold-and-wait too, but needs the randomness or it
+   fails, retrying after a random delay. Breaks hold-and-wait, but needs the randomness or it
    becomes a livelock.
 
 Say which you would ship: ordering, because it is deterministic and has no retry storms.

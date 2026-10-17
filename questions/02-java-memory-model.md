@@ -235,7 +235,7 @@ reason `AtomicLong` exists as a type rather than as a convenience wrapper.
 - tags: atomicity, race-condition
 
 * [ ] Exactly 2,000,000
-* [x] Somewhere between 1 and 2,000,000, because `i++` is read, add and write, and updates are lost when they interleave
+* [x] Somewhere between 2 and 2,000,000, because `i++` is read, add and write, and updates are lost when they interleave
 * [ ] Always exactly 1,000,000
 * [ ] A `ConcurrentModificationException`
 
@@ -243,10 +243,10 @@ reason `AtomicLong` exists as a type rather than as a convenience wrapper.
 writing 42 lose an increment. Run it and you will typically get something like 1.3 million, and the
 number changes every run.
 
-Interviewers usually follow up with "what is the theoretical minimum?" The answer is 2, or even 1 if
-you allow a single thread to finish before the other starts: one thread can read a stale value, be
-descheduled for the whole run, and write its own stale result at the end, discarding a million
-updates in one store.
+Interviewers usually follow up with "what is the theoretical minimum?" The answer is 2, not 1. Thread A reads 0 and is
+descheduled. B runs all but its last increment. A writes 1. B reads that 1 for its last increment and
+is descheduled. A runs the rest of its loop. B writes 2, last. It cannot go lower, because each
+thread's own writes happen-before its later reads, so its final read can never see the initial 0.
 
 Three fixes with different costs: `synchronized` (correct, contended, about 18 ops/us at 8 threads),
 `AtomicInteger` (a CAS loop, about 115), `LongAdder` (striped cells, about 1256, at the cost of a

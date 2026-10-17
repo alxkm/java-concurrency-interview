@@ -96,7 +96,9 @@ those inside libraries you did not write. Block on I/O there and you have taken 
 resource out of circulation.
 
 There is a further trap: on a single-core machine, or in a container that reports one CPU, the common
-pool has zero threads and runs everything on the caller, so your "async" code is fully synchronous.
+pool has a parallelism of 1, and `CompletableFuture` refuses a pool that small: every `*Async` call
+without an executor starts a brand-new thread instead. Nothing bounds that, so a burst of calls becomes
+a burst of threads.
 
 Pass an executor sized for the work: a bounded pool for blocking calls, and ideally a separate one per
 downstream dependency so a slow service cannot take the others with it.

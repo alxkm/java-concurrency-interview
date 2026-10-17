@@ -115,7 +115,7 @@ job.
 jcstress writes the test for you in a shape ordinary code cannot: two `@Actor` methods run with no
 synchronisation between them, the harness repeats them for millions of samples, shuffles JIT decisions
 between forks, and records the frequency of every observed result. Outcomes are labelled `ACCEPTABLE`,
-`INTERESTING` or `FORBIDDEN`, so the test fails if a guarantee is ever violated.
+`ACCEPTABLE_INTERESTING` or `FORBIDDEN`, so the test fails if a guarantee is ever violated.
 
 Use it to answer questions of the form "can this be observed at all": does this idiom need `volatile`,
 is this publication safe, can this field be seen at its default. Its output is also the most persuasive

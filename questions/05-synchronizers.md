@@ -202,8 +202,8 @@ completes exceptionally if any input fails. Nothing blocks unless you ask it to.
 
 A latch still wins in two places: coordinating threads you did not start as futures, such as a starting
 gate in a test, and simple lifecycle signalling ("the server is up"). Structured concurrency covers
-the fan-out case with cancellation on top, which is the answer to the follow-up about what you would
-use on Java 21 and newer.
+the fan-out case with cancellation on top, which is the answer to the follow-up about where this is
+heading, with the caveat that it is still a preview API as of Java 25.
 
 ## Why must a `Semaphore` release live in a `finally`, and what goes wrong if it does not?
 - id: semaphore-leak

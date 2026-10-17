@@ -86,8 +86,10 @@ threads, the locks each holds and the lock each wants.
 Two caveats worth raising, because they are what the follow-up question is about. Deadlock detection
 covers monitors and, since Java 6, `java.util.concurrent` locks that implement `AbstractOwnableSynchronizer`,
 but not a `Semaphore` misuse or a latch nobody counts down, which is a hang without a cycle. And a
-thread waiting on a `ReentrantLock` shows as WAITING at `LockSupport.park`, not BLOCKED, so the
-ownership line (`- parking to wait for <0x...> owned by "worker-3"`) is what you look for.
+thread waiting on a `ReentrantLock` shows as WAITING at `LockSupport.park`, not BLOCKED, and its
+frame only says `- parking to wait for <0x...> (a java.util.concurrent.locks.ReentrantLock$NonfairSync)`.
+To find the owner, take the dump with `jstack -l` (or `jcmd <pid> Thread.print -l`) and look for that
+address under another thread's "Locked ownable synchronizers".
 
 Take three dumps a few seconds apart. One dump shows where threads are; three show whether they are
 moving.

@@ -262,8 +262,9 @@ try {
 }
 ```
 
-In Java 21, `ScopedValue` is the intended replacement: immutable, bounded to a scope, and inherited by
-structured concurrency forks without any of this.
+`ScopedValue` is the intended replacement: immutable, bounded to a scope, and inherited by
+structured concurrency forks without any of this. It was a preview API from Java 21 and is final since
+Java 25 (JEP 506); structured concurrency is still a preview there.
 
 ## What is work stealing, and which executors use it?
 - id: work-stealing
@@ -280,8 +281,9 @@ work-stealing pool each worker owns a double-ended queue. It pushes and pops fro
 which keeps the freshest and most cache-warm task), and an idle worker steals from the opposite end
 (FIFO, taking the oldest and typically largest piece of work).
 
-`ForkJoinPool`, the common pool behind parallel streams, `Executors.newWorkStealingPool` and the
-virtual thread scheduler all work this way. It shines for recursive divide-and-conquer where tasks
+`ForkJoinPool` and the common pool behind parallel streams work this way. `Executors.newWorkStealingPool`
+and the virtual thread scheduler steal the same way but run their own queue FIFO (`asyncMode`), which
+suits event-style tasks that are never joined. It shines for recursive divide-and-conquer where tasks
 spawn subtasks; it buys little for uniform, independent, blocking tasks, where a plain pool is simpler
 and just as fast.
 

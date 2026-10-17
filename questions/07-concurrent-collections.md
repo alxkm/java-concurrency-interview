@@ -165,7 +165,7 @@ probabilistic balanced structure that can be updated with CAS rather than the ro
 tree would need under a lock.
 
 The trade-off is the usual one: O(log n) instead of O(1) and worse constants, so do not use it as a
-general-purpose map. Its `size()` is also O(n), because there is no counter to read.
+general-purpose map. Since Java 9 its `size()` reads a `LongAdder`, so it is cheap; on Java 8 it walked the whole list.
 
 ## How would you build a thread-safe cache with `computeIfAbsent`, and what is the trap?
 - id: computeifabsent-trap
@@ -181,7 +181,7 @@ general-purpose map. Its `size()` is also O(n), because there is no counter to r
 waits and gets the same value, with no double computation and no check-then-act race.
 
 The trap is what runs under the bin lock. If the mapping function updates the same map, you can get an
-`IllegalStateException` ("recursive update") or, in the pre-Java-9 versions, a corrupted table. If it
+`IllegalStateException` ("recursive update") or, on Java 8, a thread that spins forever inside the call (JDK-8062841). If it
 is slow (an I/O call, a remote lookup), every other writer that hashes to the same bin is blocked for
 its whole duration, and if two threads compute entries that recursively depend on each other, they
 deadlock.

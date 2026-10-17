@@ -160,14 +160,15 @@ the resource is, not per JVM.
 * [ ] Give each philosopher their own pair of forks
 
 Five philosophers, five forks, everyone grabbing left then right: a perfect circular wait. The three
-standard fixes, each breaking a different Coffman condition:
+standard fixes, and the Coffman condition each one breaks:
 
 1. **Lock ordering**: number the forks and always take the lower-numbered one first. The last
    philosopher then reaches right-then-left, which breaks the cycle. One line of change.
 2. **A waiter**: a `Semaphore` with four permits, so at most four philosophers sit down and someone can
-   always eat. Breaks hold-and-wait.
+   always eat. With one seat empty the cycle can never close, so this breaks circular wait, like
+   ordering, without numbering anything.
 3. **tryLock with backoff**: take the first fork, `tryLock` the second, and put the first down if it
-   fails, retrying after a random delay. Breaks hold-and-wait too, but needs the randomness or it
+   fails, retrying after a random delay. Breaks hold-and-wait, but needs the randomness or it
    becomes a livelock.
 
 Say which you would ship: ordering, because it is deterministic and has no retry storms.
