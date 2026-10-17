@@ -84,7 +84,7 @@ and `CompletableFuture`'s async methods use it when you do not pass an executor.
 
 So a single parallel stream doing blocking I/O occupies a scarce global resource, and every other
 parallel operation in the process slows down or stalls. On a machine reporting one CPU, the common pool
-has zero threads and everything runs on the caller.
+has a single worker, so a parallel stream gets that one thread plus the caller.
 
 You can raise its size with `-Djava.util.concurrent.ForkJoinPool.common.parallelism=N`, which is a
 blunt global setting, or run the stream inside your own `ForkJoinPool` by submitting it there, which
@@ -175,8 +175,9 @@ task tree.
 
 Its characteristics (`SIZED`, `SUBSIZED`, `ORDERED`, `DISTINCT`, `SORTED`, `IMMUTABLE`, `NONNULL`) are
 what the pipeline optimises against. An array spliterator is `SIZED` and `SUBSIZED`, so splits are
-exact and free. A linked list's is neither: `trySplit` has to walk the nodes to buffer a prefix, and the
-split is uneven.
+exact and free. A linked list's reports the same flags, but
+its `trySplit` has to walk the nodes and copy a batch into an array, and the batches start small and
+grow, so every split costs a traversal and the halves are uneven.
 
 If you write a custom data source and want parallel streams over it to be worth anything, implementing
 `trySplit` and reporting accurate characteristics is the work. The default from
@@ -244,8 +245,8 @@ thread, and the work it would have stolen goes undone. Block all of them and the
 CPU sits idle.
 
 `ForkJoinPool.ManagedBlocker` is the official escape. It tells the pool "I am about to block", and the
-pool may compensate by starting an extra thread. `ConcurrentHashMap.computeIfAbsent` and the
-`CompletableFuture` join paths use it internally.
+pool may compensate by starting an extra thread. `CompletableFuture`'s `join` and `get` use it
+internally.
 
 The better answer in 2026 is that blocking work belongs on virtual threads or a dedicated pool, and
 fork/join should keep to what it was built for.

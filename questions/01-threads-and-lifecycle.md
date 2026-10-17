@@ -168,7 +168,7 @@ A second detail interviewers like: a `Thread` object is single use. Calling `sta
 - tags: diagnostics, lifecycle
 
 * [ ] They are the same state under different names
-* [x] BLOCKED is waiting for a monitor; WAITING and TIMED_WAITING are waiting to be signalled, with and without a deadline
+* [x] BLOCKED is waiting for a monitor; WAITING and TIMED_WAITING are waiting to be signalled, without and with a deadline
 * [ ] BLOCKED means the thread was interrupted
 * [ ] WAITING means the thread is on a CPU run queue
 

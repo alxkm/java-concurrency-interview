@@ -57,7 +57,8 @@ Measured on Java 21, a `synchronized` block around a blocking call cost about 6x
 the same code with a `ReentrantLock`. Native frames (JNI) pin as well and cannot be fixed by swapping a
 lock.
 
-Diagnosis: `-Djdk.tracePinnedThreads=full`, or the `jdk.VirtualThreadPinned` JFR event. The fix before
+Diagnosis: the `jdk.VirtualThreadPinned` JFR event, or `-Djdk.tracePinnedThreads=full` before JDK 24,
+which removed that flag. The fix before
 JDK 24 is to replace `synchronized` around blocking calls with `ReentrantLock`. JEP 491 in JDK 24
 removed most monitor pinning, so on newer JVMs this is largely historical, but the question is still
 asked and the JFR event is still the way to check.
@@ -141,7 +142,8 @@ try (var scope = StructuredTaskScope.open()) {      // JDK 25 API shape
 }   // on any exit path, both forks are finished or cancelled
 ```
 
-The API is still evolving (preview across JDK 19 to 24, and the factory-based shape from JDK 25), so
+The API is still evolving (incubating in JDK 19 and 20, a preview from JDK 21, and still a preview in the factory-based shape
+of JDK 25), so
 name the concept confidently and the exact signature with a caveat.
 
 ## What are `ShutdownOnFailure` and `ShutdownOnSuccess` for?
@@ -226,7 +228,7 @@ I/O in a monitor (plenty of older JDBC drivers and HTTP clients did) will pin ev
 calls it, and the application's throughput collapses in a way that points at the wrong place.
 
 The guidance for that era: audit your own blocking paths, replace monitors around them with
-`ReentrantLock`, and check dependencies with `-Djdk.tracePinnedThreads=full`.
+`ReentrantLock`, and check dependencies with `-Djdk.tracePinnedThreads=full`, a flag JDK 24 removed along with the problem.
 
 JDK 24's JEP 491 made monitors unmount properly, which retires most of this. Give both halves in an
 interview: the mechanism, and the version where it stopped mattering, because the answer depends
@@ -248,7 +250,7 @@ resources. That is the standard demonstration: start a million threads that each
 watch it finish in about a second.
 
 The same retrofit covers `java.net` sockets, `NIO` channels, `java.util.concurrent` locks and queues,
-`Object.wait` and `Process.waitFor`. What is not covered: `synchronized` on older JVMs, native calls,
+and `Process.waitFor`. What is not covered: `synchronized` and `Object.wait` before JDK 24, native calls,
 and file I/O on some platforms, where the JVM falls back to a platform thread underneath.
 
 Sleeping as a way to coordinate threads remains a bad idea, but for reasons of correctness rather than

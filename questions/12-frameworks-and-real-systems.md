@@ -181,8 +181,9 @@ have no trace id.
 
 The mechanisms, in increasing order of tidiness: capture the values before the handoff and restore them
 inside the task, usually via a decorator that wraps every `Runnable`; use the framework's own bridge
-(`TaskDecorator`, `ContextSnapshot` from Micrometer Context Propagation, Reactor's `Context`); or, on
-Java 21 and newer, use `ScopedValue`, which is inherited by structured concurrency forks by design.
+(`TaskDecorator`, `ContextSnapshot` from Micrometer Context Propagation, Reactor's `Context`); or use
+`ScopedValue`, final since Java 25 and a preview before that, which structured concurrency forks
+inherit by design.
 
 Whatever you use, the matching `finally` that clears the value belongs there too. Pooled threads keep
 whatever you leave behind, and leaked context is worse than missing context: the next request logs

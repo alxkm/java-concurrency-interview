@@ -24,7 +24,7 @@ Runnable: [locks](https://github.com/alxkm/java-concurrency-patterns/tree/master
 - tags: aqs, locks, internals
 
 * [ ] A base class for thread pools
-* [x] A framework holding an atomic int state plus a CLH wait queue, used by ReentrantLock, Semaphore, CountDownLatch, ReadWriteLock and FutureTask
+* [x] A framework holding an atomic int state plus a CLH wait queue, used by ReentrantLock, Semaphore, CountDownLatch and ReentrantReadWriteLock
 * [ ] The implementation of `synchronized`
 * [ ] A lock-free queue implementation
 
@@ -34,7 +34,8 @@ else, the queueing, parking, unparking and cancellation, is inherited.
 
 `ReentrantLock` uses state as a hold count. `Semaphore` uses it as a permit count. `CountDownLatch`
 uses it as the remaining count and never lets it go back up. `ReentrantReadWriteLock` packs readers
-and writers into two halves of the same int. `FutureTask` and `ThreadPoolExecutor.Worker` use it too.
+and writers into two halves of the same int. `ThreadPoolExecutor.Worker` uses it too, as a small non-reentrant lock. `FutureTask` did until Java 7,
+and has used its own state field and stack of waiters since.
 
 Note that `synchronized` is not on the list: monitors are implemented in the JVM, not in Java, which is
 why a thread waiting on a `ReentrantLock` appears as WAITING at `LockSupport.park` rather than as
@@ -210,8 +211,9 @@ and helps the sibling hyperthread.
 * [ ] Only if it calls `join()` on itself
 
 `synchronized` and `ReentrantLock` are reentrant, so recursion is fine there. `StampedLock` is not
-reentrant at all, and reacquiring any of its locks on the same thread parks that thread forever with no
-owner ever coming to release it.
+reentrant: asking for its write lock while already holding the write lock or a read lock parks the
+thread forever, because the owner it waits for is itself. A second read lock usually succeeds, since
+reads are shared, but it can still hang if a writer has queued in between.
 
 The subtler case is lock upgrade. Holding a read lock and asking for the write lock waits for all
 readers to leave, including the caller, which never will. Downgrading is legal and supported: take the

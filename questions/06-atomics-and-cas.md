@@ -30,8 +30,11 @@ CAS takes an address, the value you expect to find and the value you want to ins
 swap atomically only if the expectation holds. On x86 it is `lock cmpxchg`; on ARM it is a
 load-linked / store-conditional pair. It returns whether it succeeded.
 
-`incrementAndGet` reads the current value, computes value plus one, and calls `compareAndSet`. If
-another thread got in first, the CAS fails and the whole thing is retried with the new value. No lock
+Conceptually, `incrementAndGet` reads the current value, computes value plus one, and calls
+`compareAndSet`. If another thread got in first, the CAS fails and the whole thing is retried with the
+new value. That loop is what `updateAndGet` still does, and what `getAndAddInt` falls back to. On x86,
+HotSpot replaces the plain increment with a single `lock xadd`, which cannot fail, so the retry only
+exists where the hardware has no fetch-and-add. No lock
 is ever taken and no thread is ever parked, which is why a failing thread does not block anyone else.
 
 The consequence to state in an interview: CAS is lock-free, not wait-free. The system always makes
@@ -141,7 +144,11 @@ The atomic classes are thin wrappers. Since Java 9 the supported way to do it yo
 private volatile long value;
 private static final VarHandle VALUE;
 static {
-    VALUE = MethodHandles.lookup().findVarHandle(Counter.class, "value", long.class);
+    try {
+        VALUE = MethodHandles.lookup().findVarHandle(Counter.class, "value", long.class);
+    } catch (ReflectiveOperationException e) {
+        throw new ExceptionInInitializerError(e);
+    }
 }
 
 void increment() {
@@ -164,7 +171,7 @@ use `AtomicLong` unless you have measured a reason not to.
 
 * [ ] `weakCompareAndSet` compares with `equals`
 * [x] The weak form may fail spuriously and has weaker ordering, which makes it cheaper on some architectures inside a loop that retries anyway
-* [ ] The weak form is deprecated
+* [ ] The weak form skips the comparison and always writes
 * [ ] The weak form does not use CAS at all
 
 `weakCompareAndSet` is allowed to return false even when the value matched. On ARM and POWER, where
@@ -174,6 +181,10 @@ intervening interrupt, and forcing a retry in hardware costs more than letting t
 It is only correct inside a loop that would retry anyway. Using it for a one-shot "set this flag if it
 is still null" is a bug, because a spurious failure is indistinguishable from a real one. On x86 the
 two compile to the same instruction, which is why testing on x86 proves nothing here.
+
+One naming trap: on the atomic classes, the method called `weakCompareAndSet` has been deprecated since
+Java 9, because the name never said which memory ordering it had. Use `weakCompareAndSetPlain` or
+`weakCompareAndSetVolatile`, which do.
 
 ## Is `AtomicReference` enough to make the object it points at thread safe?
 - id: atomicreference-scope
