@@ -19,3 +19,6 @@ bin/
 # OS
 .DS_Store
 Thumbs.db
+
+# Exported by the pages workflow from questions/
+site/questions.json

@@ -270,6 +270,27 @@ class QuizTest {
     }
 
     @Test
+    @DisplayName("JSON strings escape what the answers contain: quotes, backslashes, newlines, tabs")
+    void jsonEscaping() {
+        assertEquals("\"say \\\"hi\\\"\"", Quiz.jsonString("say \"hi\""));
+        assertEquals("\"C:\\\\dir\"", Quiz.jsonString("C:\\dir"));
+        assertEquals("\"a\\nb\\tc\"", Quiz.jsonString("a\nb\tc"));
+        assertEquals("\"\\u0001\"", Quiz.jsonString("\u0001"));
+    }
+
+    @Test
+    @DisplayName("the web export carries every question, with its options and answer")
+    void jsonExport(@TempDir Path dir) throws IOException {
+        Quiz.Topic topic = parse(dir, TOPIC);
+        String json = Quiz.json(new Quiz.Bank(List.of(topic)));
+        assertTrue(json.startsWith("{\"topics\":["), json);
+        assertTrue(json.contains("\"id\":\"trylock-free\""), json);
+        assertTrue(json.contains("\"level\":\"junior\""), json);
+        assertTrue(json.contains("{\"text\":\"true, and the caller now holds the lock\",\"correct\":true}"), json);
+        assertTrue(json.contains("## not a heading, because it is inside a fence"), json);
+    }
+
+    @Test
     @DisplayName("levels accept the words people actually type")
     void levelAliases() {
         assertEquals(Quiz.Level.JUNIOR, Quiz.Level.parse("Easy"));

@@ -1,0 +1,50 @@
+name: pages
+
+# The web version: site/index.html plus questions.json, exported from questions/ by the same parser the
+# terminal quiz uses, so the site cannot disagree with the files.
+on:
+  push:
+    branches: [ "master" ]
+    paths: [ "questions/**", "site/**", "src/main/**", ".github/workflows/pages.yml" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Export the questions
+        run: |
+          java src/main/java/org/alxkm/interview/Quiz.java --export-json site/questions.json
+          python3 -m json.tool site/questions.json > /dev/null
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

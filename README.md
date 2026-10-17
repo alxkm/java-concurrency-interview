@@ -47,7 +47,10 @@ It is also a quiz you can run. One file, no dependencies, ASCII only.
 
 ## Run it
 
-Java 21 or newer, and nothing else. With [JBang](https://www.jbang.dev), not even a clone:
+No install at all: **[read the questions or take the quiz in your browser](https://alxkm.github.io/java-concurrency-interview/)**,
+with search and a level filter.
+
+In the terminal, Java 21 or newer and nothing else. With [JBang](https://www.jbang.dev), not even a clone:
 
 ```bash
 jbang quiz@alxkm/java-concurrency-interview
