@@ -271,3 +271,35 @@ counts.merge(word, 1L, Long::sum);
 threads queue on that key's bin, and the usual next step is a `LongAdder` per key:
 `counts.computeIfAbsent(word, k -> new LongAdder()).increment()`. The map lookup is then read-only for
 existing words, and the increment spreads over cells.
+
+## What is the difference between `add`, `offer` and `put` on a `BlockingQueue`?
+- id: blocking-queue-methods
+- level: junior
+- tags: queues, api, backpressure
+
+* [ ] They are aliases kept for compatibility
+* [x] On a full queue `add` throws, `offer` returns false or waits up to a timeout, and `put` blocks
+* [ ] `put` throws, `add` blocks and `offer` waits forever
+* [ ] Only `put` is safe to call from several threads
+
+Each operation comes in four flavours, and the javadoc's own table is worth having in your head:
+
+| | Throws | Returns a special value | Blocks | Times out |
+|---|---|---|---|---|
+| Insert | `add(e)` | `offer(e)` | `put(e)` | `offer(e, time, unit)` |
+| Remove | `remove()` | `poll()` | `take()` | `poll(time, unit)` |
+| Examine | `element()` | `peek()` | | |
+
+Which to use is a design decision about what should happen when the other side is slow. A producer
+that must not lose data and is allowed to wait uses `put`, which is backpressure. A producer that must
+never block, such as a request thread or an event loop, uses `offer` with a timeout and does something
+deliberate with `false`: shed the request, count it, return 503. `add` turns a full queue into an
+exception, which is rarely what you want.
+
+On the consumer side, `take` waits forever and responds to interruption, while `poll` with a timeout lets
+a loop wake up regularly to check a shutdown flag. `drainTo` moves everything available in one lock
+acquisition, which is the cheap way to consume in batches.
+
+Two details people miss: a `BlockingQueue` rejects `null` with a `NullPointerException`, because `poll`
+uses `null` to mean empty. And on an unbounded queue `add` and `offer` never fail, which is the
+unbounded-queue problem again: the backpressure you designed for never happens.

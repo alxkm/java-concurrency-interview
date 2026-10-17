@@ -251,3 +251,63 @@ thread's own writes happen-before its later reads, so its final read can never s
 Three fixes with different costs: `synchronized` (correct, contended, about 18 ops/us at 8 threads),
 `AtomicInteger` (a CAS loop, about 115), `LongAdder` (striped cells, about 1256, at the cost of a
 `sum()` that walks them all).
+
+## What is the difference between a data race and a race condition?
+- id: data-race-vs-race-condition
+- level: senior
+- tags: memory-model, race-condition, theory
+
+* [ ] They are two names for the same bug
+* [x] A data race is unordered access to one variable; a race condition is a timing-dependent result
+* [ ] A data race can only happen with `long` and `double`
+* [ ] A race condition always contains a data race
+
+A **data race** is a memory model term with a precise definition: two accesses to the same variable from
+different threads, at least one of them a write, not ordered by happens-before. A **race condition** is
+a correctness term: the outcome of the program depends on the relative timing of its threads.
+
+Neither implies the other, and an example of each is what the interviewer is waiting for.
+
+A race condition with no data race: check-then-act on a thread-safe class. Every access goes through a
+`ConcurrentHashMap`, so nothing is unordered, and two threads can still both see the key missing.
+
+```java
+if (!map.containsKey(key)) {   // a ConcurrentHashMap: no data race anywhere
+    map.put(key, value);       // and still a race condition
+}
+```
+
+A data race with no race condition: `String.hashCode()` caches the hash in a plain, non-volatile `int`
+field. Two threads may compute it at once and write it unsynchronised, which is a data race, but they
+always write the same value and an `int` cannot tear, so the result is always right. It is the textbook
+benign race, and it is only benign because `String` is immutable.
+
+Why the distinction matters: being free of data races is what the memory model rewards with sequential
+consistency, and fixing a data race with `volatile` does nothing for a race condition. The check-then-act
+above needs `putIfAbsent` or `computeIfAbsent`, not a stronger field.
+
+## What does the Java memory model promise a correctly synchronized program?
+- id: sc-drf
+- level: senior
+- tags: memory-model, theory
+
+* [ ] Nothing extra; you still have to reason about reordering yourself
+* [x] Sequential consistency: with no data races, every execution looks like an interleaving of the source
+* [ ] That every shared variable behaves as if it were volatile
+* [ ] That the program cannot deadlock
+
+This is the guarantee that makes the memory model usable, usually called SC-DRF. The JLS defines a
+program as correctly synchronized when none of its sequentially consistent executions has a data race,
+and promises that every execution of such a program appears sequentially consistent: some interleaving
+of each thread's statements, in program order.
+
+The compiler, the JIT and the CPU still reorder, buffer and cache exactly as much as before. The promise
+is that a data-race-free program cannot tell. So the practical method is not to reason about fences at
+all: make every shared access ordered by happens-before, through a lock, a `volatile`, a `final` field
+or a `java.util.concurrent` class, and then reason about interleavings, which is hard enough already.
+
+Two follow-ups separate a strong answer. A program with a data race loses the guarantee, but Java still
+keeps it memory safe: no torn references, no values out of thin air, no broken type safety. C and C++
+are harsher, where a data race is undefined behaviour. And "correctly synchronized" is about data races
+only, so a race-free program can still have race conditions, such as check-then-act on a concurrent
+map. Sequential consistency makes the bug reproducible in your head; it does not make it go away.
