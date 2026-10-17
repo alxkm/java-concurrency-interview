@@ -215,6 +215,36 @@ class QuizTest {
         }
 
         @Test
+        @DisplayName("a miss is learned after two right answers in a row, and a new miss undoes it")
+        void learnedNeedsAStreak(@TempDir Path dir) {
+            Quiz.Progress progress = new Quiz.Progress(dir.resolve(".progress"));
+            progress.record("q", false);
+            progress.record("q", true);
+            assertFalse(progress.learned("q"), "one right answer after a miss is not enough");
+            progress.record("q", true);
+            assertTrue(progress.learned("q"));
+            progress.record("q", false);
+            assertFalse(progress.learned("q"), "a fresh miss puts it back into review");
+        }
+
+        @Test
+        @DisplayName("the streak survives a reload, and an old three-column file keeps what it knew")
+        void streakFormat(@TempDir Path dir) throws IOException {
+            Path file = dir.resolve(".progress");
+            Quiz.Progress progress = new Quiz.Progress(file);
+            progress.record("q", true);
+            progress.record("q", true);
+            progress.save();
+            assertTrue(new Quiz.Progress(file).learned("q"));
+
+            Files.writeString(file, "known|5|1\nshaky|1|3\n", StandardCharsets.UTF_8);
+            Quiz.Progress legacy = new Quiz.Progress(file);
+            assertTrue(legacy.learned("known"));
+            assertFalse(legacy.learned("shaky"));
+            assertEquals(3, legacy.wrong("shaky"));
+        }
+
+        @Test
         @DisplayName("lives next to a checkout, and in the home directory when run from the jar")
         void location(@TempDir Path dir) throws IOException {
             Path checkout = Files.createDirectories(dir.resolve("repo/questions"));
