@@ -1279,6 +1279,60 @@ public final class Quiz {
                 bank.questions().stream().filter(q -> q.level() == Level.SENIOR).count());
     }
 
+    /**
+     * The whole bank as JSON, for the web version of the quiz. Written by hand because the quiz has no
+     * dependencies and JSON needs only one escaping rule set; {@code QuizTest} checks that rule set.
+     */
+    static String json(Bank bank) {
+        StringBuilder out = new StringBuilder("{\"topics\":[");
+        for (int t = 0; t < bank.topics().size(); t++) {
+            Topic topic = bank.topics().get(t);
+            out.append(t == 0 ? "" : ",").append("\n{")
+                    .append("\"id\":").append(jsonString(topic.id()))
+                    .append(",\"title\":").append(jsonString(topic.title()))
+                    .append(",\"intro\":").append(jsonString(topic.intro()))
+                    .append(",\"diagram\":").append(jsonString(topic.diagram()))
+                    .append(",\"questions\":[");
+            for (int q = 0; q < topic.questions().size(); q++) {
+                Question question = topic.questions().get(q);
+                out.append(q == 0 ? "" : ",").append("\n{")
+                        .append("\"id\":").append(jsonString(question.id()))
+                        .append(",\"prompt\":").append(jsonString(question.prompt()))
+                        .append(",\"level\":").append(jsonString(question.level().label()))
+                        .append(",\"tags\":[").append(question.tags().stream()
+                                .map(Quiz::jsonString).collect(Collectors.joining(","))).append("]")
+                        .append(",\"options\":[").append(question.options().stream()
+                                .map(o -> "{\"text\":" + jsonString(o.text()) + ",\"correct\":" + o.correct() + "}")
+                                .collect(Collectors.joining(","))).append("]")
+                        .append(",\"answer\":").append(jsonString(question.answer()))
+                        .append("}");
+            }
+            out.append("]}");
+        }
+        return out.append("\n]}\n").toString();
+    }
+
+    static String jsonString(String text) {
+        StringBuilder out = new StringBuilder("\"");
+        for (char c : text.toCharArray()) {
+            switch (c) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (c < 0x20 || c == ' ' || c == ' ') {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+                }
+            }
+        }
+        return out.append('"').toString();
+    }
+
     // -------------------------------------------------------------------- main
 
     public static void main(String[] args) {
@@ -1290,6 +1344,7 @@ public final class Quiz {
                       (no arguments)     the interactive quiz
                       --export-readme    regenerate the catalogue inside README.md
                       --stats            question counts by topic and level
+                      --export-json FILE the bank as JSON, for the web version (default questions.json)
                       --no-color         plain output, no ANSI escapes
                       --no-shuffle       keep options in the order the file lists them
                       -Dquestions=DIR    read questions from somewhere other than ./questions
@@ -1304,6 +1359,17 @@ public final class Quiz {
         }
         if (flags.contains("--stats")) {
             stats(bank);
+            return;
+        }
+        int jsonFlag = flags.indexOf("--export-json");
+        if (jsonFlag >= 0) {
+            Path target = Path.of(jsonFlag + 1 < flags.size() ? flags.get(jsonFlag + 1) : "questions.json");
+            try {
+                Files.writeString(target, json(bank), StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                throw new UncheckedIOException("cannot write " + target, e);
+            }
+            System.out.println(target + " written: " + bank.questions().size() + " questions");
             return;
         }
 
