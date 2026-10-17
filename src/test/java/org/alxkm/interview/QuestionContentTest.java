@@ -100,6 +100,23 @@ class QuestionContentTest {
     }
 
     @Test
+    @DisplayName("every question the JDK version page links to exists, so ids and links cannot drift")
+    void versionPageLinksExist() throws IOException {
+        Path page = Quiz.questionsDir().getParent().resolve("docs/jdk-versions.md");
+        String content = Files.readString(page, StandardCharsets.UTF_8);
+        Set<String> ids = new HashSet<>(BANK.questions().stream().map(Quiz.Question::id).toList());
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("java-concurrency-interview/#([a-z0-9-]+)\\)").matcher(content);
+        int links = 0;
+        while (m.find()) {
+            links++;
+            String id = m.group(1);
+            assertTrue(ids.contains(id), () -> "docs/jdk-versions.md links to a question that does not exist: " + id);
+        }
+        assertTrue(links >= 20, "expected the version page to link to its questions");
+    }
+
+    @Test
     @DisplayName("a README checked out with CRLF line endings still counts as up to date")
     void readmeCheckIgnoresLineEndings() throws IOException {
         // Git for Windows defaults to core.autocrlf=true, so a fresh clone there has CRLF everywhere.

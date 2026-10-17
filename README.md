@@ -99,6 +99,8 @@ repository with the runnable benchmarks.
 monitor is free" now dates you. Monitor pinning on virtual threads was mostly fixed in JDK 24, so the
 right answer depends on which JVM the team runs.
 
+Which answer depends on which JDK is collected in one table: [what changed in which JDK](docs/jdk-versions.md).
+
 What it is not: a list of definitions to memorise the night before. If a question here can be answered
 by reciting a sentence, it is a bad question and a pull request would be welcome.
 
