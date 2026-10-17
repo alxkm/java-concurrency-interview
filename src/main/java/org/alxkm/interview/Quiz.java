@@ -439,10 +439,14 @@ public final class Quiz {
             try {
                 for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
                     String[] parts = line.split("\\|");
-                    if (parts.length == 3) {
-                        counts.put(parts[0].trim(), new int[] {
-                                Integer.parseInt(parts[1].trim()),
-                                Integer.parseInt(parts[2].trim())});
+                    if (parts.length == 3 || parts.length == 4) {
+                        int right = Integer.parseInt(parts[1].trim());
+                        int wrong = Integer.parseInt(parts[2].trim());
+                        // Files written before the streak existed: keep what used to count as known.
+                        int streak = parts.length == 4
+                                ? Integer.parseInt(parts[3].trim())
+                                : (right > wrong ? LEARNED : 0);
+                        counts.put(parts[0].trim(), new int[] {right, wrong, streak});
                     }
                 }
             } catch (IOException | RuntimeException e) {
@@ -450,16 +454,35 @@ public final class Quiz {
             }
         }
 
+        /** Right answers in a row, since the last miss, that it takes to stop reviewing a question. */
+        static final int LEARNED = 2;
+
         void record(String id, boolean correct) {
-            counts.computeIfAbsent(id, k -> new int[2])[correct ? 0 : 1]++;
+            int[] c = counts.computeIfAbsent(id, k -> new int[3]);
+            if (correct) {
+                c[0]++;
+                c[2]++;
+            } else {
+                c[1]++;
+                c[2] = 0;
+            }
         }
 
         int right(String id) {
-            return counts.getOrDefault(id, new int[2])[0];
+            return counts.getOrDefault(id, new int[3])[0];
         }
 
         int wrong(String id) {
-            return counts.getOrDefault(id, new int[2])[1];
+            return counts.getOrDefault(id, new int[3])[1];
+        }
+
+        /**
+         * Answered right {@link #LEARNED} times in a row since the last miss. A question missed once and
+         * then answered right is not learned yet; one answered right twice since is, however many
+         * times it was missed before.
+         */
+        boolean learned(String id) {
+            return counts.getOrDefault(id, new int[3])[2] >= LEARNED;
         }
 
         boolean seen(String id) {
@@ -472,7 +495,8 @@ public final class Quiz {
 
         void save() {
             String body = counts.entrySet().stream()
-                    .map(e -> e.getKey() + "|" + e.getValue()[0] + "|" + e.getValue()[1])
+                    .map(e -> e.getKey() + "|" + e.getValue()[0] + "|" + e.getValue()[1] + "|"
+                            + e.getValue()[2])
                     .collect(Collectors.joining("\n"));
             try {
                 Files.writeString(file, body + "\n", StandardCharsets.UTF_8);
@@ -806,7 +830,7 @@ public final class Quiz {
             for (int i = 0; i < topics.size(); i++) {
                 Topic topic = topics.get(i);
                 long known = topic.questions().stream()
-                        .filter(q -> progress.right(q.id()) > 0)
+                        .filter(q -> progress.learned(q.id()))
                         .count();
                 ui.line(String.format("    [%2d] %-46s %s %2d/%d", i + 1, topic.title(),
                         ui.bar((int) known, topic.questions().size(), 10),
@@ -863,8 +887,12 @@ public final class Quiz {
             return new ArrayList<>(selected);
         }
 
+        /** Misses not yet made up for count most, then questions never asked; learned ones least. */
         private int weight(Question q) {
-            return progress.wrong(q.id()) * 3 + (progress.seen(q.id()) ? 0 : 2);
+            if (!progress.seen(q.id())) {
+                return 2;
+            }
+            return progress.learned(q.id()) ? 0 : 1 + progress.wrong(q.id()) * 3;
         }
 
         private List<Question> sample(List<Question> from, int count) {
@@ -874,12 +902,17 @@ public final class Quiz {
         }
 
         private void reviewMisses() {
+            // A miss stays here until it has been answered right twice in a row, so review ends
+            // instead of replaying every mistake ever made.
             List<Question> missed = bank.questions().stream()
-                    .filter(q -> progress.wrong(q.id()) > 0)
+                    .filter(q -> progress.wrong(q.id()) > 0 && !progress.learned(q.id()))
                     .sorted((a, b) -> Integer.compare(progress.wrong(b.id()), progress.wrong(a.id())))
                     .collect(Collectors.toCollection(ArrayList::new));
             if (missed.isEmpty()) {
-                ui.line("  " + ui.dim("nothing missed yet. Take a quiz first."));
+                boolean everMissed = bank.questions().stream().anyMatch(q -> progress.wrong(q.id()) > 0);
+                ui.line("  " + ui.dim(everMissed
+                        ? "nothing to review: every miss has since been answered right twice in a row."
+                        : "nothing missed yet. Take a quiz first."));
                 return;
             }
             run(missed.subList(0, Math.min(15, missed.size())), "review");
@@ -1083,17 +1116,17 @@ public final class Quiz {
         private void progressScreen() {
             int seen = (int) bank.questions().stream().filter(q -> progress.seen(q.id())).count();
             int mastered = (int) bank.questions().stream()
-                    .filter(q -> progress.right(q.id()) > progress.wrong(q.id()))
+                    .filter(q -> progress.learned(q.id()))
                     .count();
             ui.box(List.of(
                     "  seen      " + ui.bar(seen, bank.questions().size(), 30) + "  " + seen + "/"
                             + bank.questions().size(),
-                    "  mastered  " + ui.bar(mastered, bank.questions().size(), 30) + "  " + mastered
+                    "  learned   " + ui.bar(mastered, bank.questions().size(), 30) + "  " + mastered
                             + "/" + bank.questions().size()));
             ui.blank();
             for (Topic topic : bank.topics()) {
                 long known = topic.questions().stream()
-                        .filter(q -> progress.right(q.id()) > progress.wrong(q.id()))
+                        .filter(q -> progress.learned(q.id()))
                         .count();
                 ui.line(String.format("    %-46s %s %2d/%d", topic.title(),
                         ui.bar((int) known, topic.questions().size(), 10), known,
