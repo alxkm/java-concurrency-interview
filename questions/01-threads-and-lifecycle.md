@@ -236,3 +236,35 @@ That is the mechanism behind two classic leaks. A thread you started and forgot 
 holds its whole object graph forever. And a `ThreadLocal` on a pooled thread is never collected
 between tasks, because the thread outlives them all, which is why a `ThreadLocal` that is not removed
 in a `finally` block leaks in a web container.
+
+## What happens when a thread throws an exception nobody catches?
+- id: uncaught-exception
+- level: junior
+- tags: basics, error-handling
+
+* [ ] The whole JVM exits with that exception
+* [x] Only that thread dies; its uncaught exception handler runs and other threads carry on
+* [ ] The exception is rethrown in the thread that called `start()`
+* [ ] The thread restarts from the beginning of `run()`
+
+The exception unwinds `run()`, the thread terminates, and the JVM hands the exception to the thread's
+uncaught exception handler. The lookup goes from the thread's own handler, set with
+`setUncaughtExceptionHandler`, to its `ThreadGroup`, which delegates to
+`Thread.getDefaultUncaughtExceptionHandler()`, and if nobody set one, the stack trace is printed to
+`System.err`. Every other thread, including `main`, keeps running, and the JVM exits only when the last
+non-daemon thread finishes.
+
+That is exactly why it is dangerous. A consumer thread that dies on one malformed message stops
+consuming forever, the queue behind it fills, and the only evidence is a stack trace in a log nobody
+reads. The process looks healthy.
+
+Two habits fix it. Loops that must survive a bad input catch at the top of the loop body and carry on.
+And `main` installs a default handler that logs properly, so a dead thread is at least visible:
+
+```java
+Thread.setDefaultUncaughtExceptionHandler((thread, error) ->
+        log.error("thread {} died", thread.getName(), error));
+```
+
+In a thread pool the rules change: `execute` reaches this handler, while `submit` stores the exception in
+the `Future`, where it stays silent until someone calls `get()`.

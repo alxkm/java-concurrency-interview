@@ -266,3 +266,56 @@ thread-safe classes, say which compound sequences the caller must lock, and whic
 
 This is not paperwork: an undocumented thread safety policy is how correct code becomes incorrect two
 maintainers later.
+
+## What are the thread-safe ways to write a singleton, and which would you pick?
+- id: thread-safe-singleton
+- level: mid
+- tags: singleton, patterns, class-initialization
+
+* [ ] Only a `synchronized` `getInstance()` is truly safe
+* [x] An eager static field, a holder class or an enum, all relying on class initialization
+* [ ] Double-checked locking without `volatile`, because it is the fastest
+* [ ] A `ThreadLocal` holding one instance per thread
+
+The JVM initializes a class exactly once, under a lock, and everything the static initializer writes is
+visible to every thread that uses the class afterwards. Three of the good answers are just ways of
+borrowing that lock:
+
+```java
+final class Config {
+    private Config() { }
+
+    private static final class Holder {
+        static final Config INSTANCE = new Config();   // runs on the first call to get()
+    }
+
+    static Config get() {
+        return Holder.INSTANCE;
+    }
+}
+
+enum Registry {
+    INSTANCE;
+
+    private final Map<String, String> entries = new ConcurrentHashMap<>();
+
+    String lookup(String key) {
+        return entries.get(key);
+    }
+}
+```
+
+- **Eager** (`static final Config INSTANCE = new Config()` on the class itself) is lazy enough for almost
+  everything, since a class is only initialized on first use.
+- **The holder idiom** above is lazy, needs no `volatile` and costs nothing after the first call.
+- **An enum** is what *Effective Java* recommends: one instance, guaranteed by the language, and safe
+  against serialization and reflection creating a second.
+- A `synchronized` `getInstance()` is correct and takes a lock on every call. Double-checked locking is
+  correct only with `volatile`, and only worth it for an instance field, where there is no class to
+  initialize.
+
+Pick the holder or the enum. Then say the part people forget: a thread-safe singleton is not a
+thread-safe object. One instance shared by every thread needs its own state guarded, which is why the
+enum above uses a `ConcurrentHashMap`. And a static initializer that reaches into another class whose
+initializer reaches back can deadlock two threads on class initialization, a hang with no `synchronized`
+anywhere in the source.
