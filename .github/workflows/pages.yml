@@ -1,11 +1,14 @@
 name: pages
 
-# The web version: site/index.html plus questions.json, exported from questions/ by the same parser the
-# terminal quiz uses, so the site cannot disagree with the files.
+# The web version, built by tools/site/build.mjs from questions/ with the quiz's own parser, so the site
+# cannot disagree with the files. Pull requests build it too, so a broken build fails before merge;
+# only master deploys.
 on:
   push:
     branches: [ "master" ]
-    paths: [ "questions/**", "site/**", "src/main/**", ".github/workflows/pages.yml" ]
+    paths: [ "questions/**", "site/**", "tools/site/**", "src/main/**", ".github/workflows/pages.yml" ]
+  pull_request:
+    paths: [ "questions/**", "site/**", "tools/site/**", "src/main/**", ".github/workflows/pages.yml" ]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +17,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -29,16 +32,25 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Export the questions
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tools/site/package-lock.json
+
+      - name: Build the site
+        working-directory: tools/site
         run: |
-          java src/main/java/org/alxkm/interview/Quiz.java --export-json site/questions.json
-          python3 -m json.tool site/questions.json > /dev/null
+          npm ci
+          node build.mjs ../../_site
 
       - uses: actions/upload-pages-artifact@v5
+        if: github.event_name != 'pull_request'
         with:
-          path: site
+          path: _site
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10

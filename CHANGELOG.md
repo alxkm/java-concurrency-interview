@@ -5,6 +5,12 @@ section below whose heading matches the tag, so add one before tagging.
 
 ## Unreleased
 
+- A page per question on the site, with its own title and description, a static list of them on the
+  front page and a sitemap, so the questions can be found by search and read without JavaScript. A
+  link to one question now unfurls with that question.
+- `?mode=quiz&topic=...&level=...` opens the site straight into a quiz on one topic.
+- Markdown is rendered and highlighted at build time; the site no longer loads anything from a CDN,
+  and ASCII diagrams in answers are no longer highlighted as Java.
 - Seven questions that are asked constantly and were missing: an uncaught exception in a thread,
   data race against race condition, what the memory model promises a correctly synchronized
   program, `volatile` arrays, `add`/`offer`/`put` on a `BlockingQueue`, `Timer` against

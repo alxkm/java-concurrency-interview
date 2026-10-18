@@ -20,5 +20,6 @@ bin/
 .DS_Store
 Thumbs.db
 
-# Exported by the pages workflow from questions/
-site/questions.json
+# The web version, built by tools/site/build.mjs
+_site/
+tools/site/node_modules/
