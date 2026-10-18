@@ -3,18 +3,21 @@
 Each release is a tag and a GitHub release with the runnable jar attached. The release notes are the
 section below whose heading matches the tag, so add one before tagging.
 
-## Unreleased
+## 1.1.0
 
-- A page per question on the site, with its own title and description, a static list of them on the
-  front page and a sitemap, so the questions can be found by search and read without JavaScript. A
-  link to one question now unfurls with that question.
-- `?mode=quiz&topic=...&level=...` opens the site straight into a quiz on one topic.
-- Markdown is rendered and highlighted at build time; the site no longer loads anything from a CDN,
-  and ASCII diagrams in answers are no longer highlighted as Java.
+180 questions, up from 173, and a web version.
+
 - Seven questions that are asked constantly and were missing: an uncaught exception in a thread,
   data race against race condition, what the memory model promises a correctly synchronized
   program, `volatile` arrays, `add`/`offer`/`put` on a `BlockingQueue`, `Timer` against
   `ScheduledExecutorService`, and the thread-safe ways to write a singleton.
+- The web version at https://alxkm.github.io/java-concurrency-interview/: read and search every
+  question, or take the quiz in the browser, with the same "two right in a row" review rule as the
+  terminal. Every question has its own page, there is a sitemap, and the site works without
+  JavaScript. `?mode=quiz&topic=...&level=...` opens a quiz on one topic.
+- `docs/jdk-versions.md`: what changed in which JDK, from JSR-133 to `ScopedValue` going final in
+  Java 25, each row linked to the question that explains it.
+- `--export-json` writes the question bank as JSON.
 
 ## 1.0.0
 

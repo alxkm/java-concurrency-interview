@@ -61,7 +61,7 @@ Several correct options are allowed. The quiz notices and asks for all of them.
 
 Both are fast. The test suite will tell you exactly which question is malformed and why.
 
-To see a change on the web version, build it (Node 18 or newer) and serve it:
+To see a change on the web version, build it (Node 20 or newer) and serve it:
 
 ```bash
 cd tools/site && npm ci && node build.mjs
