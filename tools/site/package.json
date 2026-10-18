@@ -11,6 +11,6 @@
   },
   "dependencies": {
     "highlight.js": "11.11.1",
-    "marked": "15.0.12"
+    "marked": "18.1.1"
   }
 }
