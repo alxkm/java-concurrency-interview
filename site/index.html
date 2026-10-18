@@ -176,6 +176,10 @@
   };
 
   const esc = (s) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // The questions are markdown, never HTML, so any raw HTML in them is shown as text rather than run.
+  // That also lets prompts go to marked unescaped: escaping them first escaped code spans twice, and
+  // the page showed CompletableFuture<Void> as CompletableFuture&lt;Void&gt;.
+  marked.use({ renderer: { html: ({ text }) => esc(text) } });
   const md = (text) => {
     const div = document.createElement('div');
     div.className = 'md';
@@ -186,7 +190,7 @@
     });
     return div;
   };
-  const inline = (text) => marked.parseInline(esc(text).replace(/&#39;/g, "'"));
+  const inline = (text) => marked.parseInline(text);
 
   function visible() {
     const q = state.query.toLowerCase();
