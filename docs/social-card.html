@@ -1,0 +1,42 @@
+<!doctype html>
+<!--
+  The 1280x640 picture shown when a link to the site or the repository is shared (og:image, and the
+  repository's social preview in Settings). It wraps banner.svg rather than copying it, so the two
+  cannot drift apart. No question count on purpose: the picture is cached by every platform that has
+  ever unfurled the link, and a number would be stale within a week.
+
+  Regenerate after changing the banner:
+
+    msedge --headless=new --hide-scrollbars --window-size=1280,640 \
+      --screenshot=site/social-card.png docs/social-card.html
+
+  (chrome or chromium take the same flags.)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  img { display: block; width: 1280px; height: 420px; }
+  .strip {
+    margin: 26px 74px 0; padding-top: 22px; border-top: 1px solid #334155;
+    display: flex; justify-content: space-between; align-items: baseline;
+    color: #cbd5e1; font-size: 26px;
+  }
+  .strip b { color: #f0883e; font-weight: 700; }
+  .url { color: #94a3b8; font-size: 24px; }
+</style>
+</head>
+<body>
+  <img src="banner.svg" alt="">
+  <div class="strip">
+    <span><b>Read, search and quiz</b> in the browser or the terminal</span>
+    <span class="url">alxkm.github.io/java-concurrency-interview</span>
+  </div>
+</body>
+</html>

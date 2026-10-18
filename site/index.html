@@ -7,6 +7,14 @@
 <meta name="description" content="Java concurrency interview questions, answered the way you would say them out loud. Read them, search them, or take the quiz in your browser.">
 <meta property="og:title" content="Java Concurrency Interview">
 <meta property="og:description" content="Interview questions on threads, the memory model, locks, executors, CompletableFuture and virtual threads, with answers that explain the mechanism.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://alxkm.github.io/java-concurrency-interview/">
+<meta property="og:image" content="https://alxkm.github.io/java-concurrency-interview/social-card.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Java Concurrency Interview: two threads, each holding one lock and waiting for the other's">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://alxkm.github.io/java-concurrency-interview/">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23f0883e'/><path d='M10 9v14M22 9v14' stroke='white' stroke-width='3' stroke-linecap='round'/><path d='M10 16h12' stroke='white' stroke-width='2' stroke-dasharray='2 3'/></svg>">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/styles/github.min.css" media="(prefers-color-scheme: light)">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
@@ -168,6 +176,10 @@
   };
 
   const esc = (s) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // The questions are markdown, never HTML, so any raw HTML in them is shown as text rather than run.
+  // That also lets prompts go to marked unescaped: escaping them first escaped code spans twice, and
+  // the page showed CompletableFuture<Void> as CompletableFuture&lt;Void&gt;.
+  marked.use({ renderer: { html: ({ text }) => esc(text) } });
   const md = (text) => {
     const div = document.createElement('div');
     div.className = 'md';
@@ -178,7 +190,7 @@
     });
     return div;
   };
-  const inline = (text) => marked.parseInline(esc(text).replace(/&#39;/g, "'"));
+  const inline = (text) => marked.parseInline(text);
 
   function visible() {
     const q = state.query.toLowerCase();
