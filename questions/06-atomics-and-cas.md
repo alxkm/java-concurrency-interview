@@ -264,3 +264,35 @@ if (shutdown.compareAndSet(false, true)) {
 
 Reach for it when the answer to "what if two threads do this at once" is "one of them must win", and
 for a flag otherwise.
+
+## Does declaring an array `volatile` make its elements volatile?
+- id: volatile-array
+- level: mid
+- tags: volatile, atomics, arrays
+
+* [ ] Yes, `volatile` applies to everything reachable from the field
+* [x] No, only the reference is volatile; element reads and writes stay plain
+* [ ] Yes, but only for arrays of primitives
+* [ ] No, and arrays cannot be shared between threads at all
+
+`volatile int[] counts` makes the field volatile, and the field holds a reference. Assigning
+`counts = new int[10]` is a volatile write. But `counts[3] = 7` is a volatile *read* of the reference
+followed by a plain store into the array, and a thread reading `counts[3]` gets no visibility guarantee
+for that element at all. The same is true one level down for any object behind a volatile field: the
+keyword does not propagate.
+
+The tools that give each element volatile semantics, plus compare-and-set:
+
+```java
+AtomicIntegerArray counts = new AtomicIntegerArray(10);
+counts.incrementAndGet(3);      // atomic, and visible to every thread
+int seen = counts.get(3);       // a volatile read of element 3
+```
+
+`AtomicLongArray` and `AtomicReferenceArray` cover the other types, and
+`MethodHandles.arrayElementVarHandle(int[].class)` gives the same per-element access, with the weaker
+acquire and release modes too, on an ordinary array.
+
+One thing to add if the array is a set of counters hammered by many threads: adjacent elements share a
+cache line, so this is false sharing by construction. A `LongAdder` per counter, or padding, is the fix
+when the profile says so.

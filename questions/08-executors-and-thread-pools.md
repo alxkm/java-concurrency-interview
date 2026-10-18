@@ -307,3 +307,36 @@ composition with `CompletableFuture` so nothing waits; or `ForkJoinPool`, whose 
 tasks on the current thread (the reason `invokeAll` inside fork/join is safe).
 
 The same hazard appears with nested parallel streams, which all share the common pool by default.
+
+## Why is `ScheduledExecutorService` preferred to `java.util.Timer`?
+- id: timer-vs-scheduled-executor
+- level: mid
+- tags: scheduling, executors, error-handling
+
+* [ ] `Timer` is deprecated and no longer compiles on Java 21
+* [x] `Timer` runs every task on one thread, and one uncaught exception kills it and every task
+* [ ] `ScheduledExecutorService` is faster because it runs on virtual threads
+* [ ] `Timer` cannot run repeating tasks
+
+`java.util.Timer` predates `java.util.concurrent` and has three problems, all of which show up in
+production rather than in testing.
+
+It has exactly one thread. A task that runs long delays every other task, so a fixed-rate schedule
+quietly drifts and then fires several times in a row to catch up.
+
+An exception kills it. A `TimerTask` that throws terminates the timer's thread, every scheduled task is
+abandoned, and the next call to `schedule` throws `IllegalStateException`. One bad run of one job stops
+all of them, permanently, with nothing more than a stack trace on stderr.
+
+It is not configurable: no thread factory, no naming, no way to run tasks in parallel.
+
+`Timer`'s own javadoc points at the replacement:
+
+```java
+ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+scheduler.scheduleWithFixedDelay(this::refresh, 0, 30, TimeUnit.SECONDS);
+```
+
+A pool of one or more threads, a `ThreadFactory` for names, a `ScheduledFuture` per task, and a proper
+`shutdown`. An exception cancels only the schedule of the task that threw, which is better but still a
+trap of its own: wrap the body in a `try`/`catch` or that task silently stops repeating.

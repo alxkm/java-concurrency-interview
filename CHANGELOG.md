@@ -3,6 +3,13 @@
 Each release is a tag and a GitHub release with the runnable jar attached. The release notes are the
 section below whose heading matches the tag, so add one before tagging.
 
+## Unreleased
+
+- Seven questions that are asked constantly and were missing: an uncaught exception in a thread,
+  data race against race condition, what the memory model promises a correctly synchronized
+  program, `volatile` arrays, `add`/`offer`/`put` on a `BlockingQueue`, `Timer` against
+  `ScheduledExecutorService`, and the thread-safe ways to write a singleton.
+
 ## 1.0.0
 
 The first release.
