@@ -106,7 +106,7 @@ class QuestionContentTest {
         String content = Files.readString(page, StandardCharsets.UTF_8);
         Set<String> ids = new HashSet<>(BANK.questions().stream().map(Quiz.Question::id).toList());
         java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("java-concurrency-interview/#([a-z0-9-]+)\\)").matcher(content);
+                .compile("java-concurrency-interview/q/([a-z0-9-]+)/\\)").matcher(content);
         int links = 0;
         while (m.find()) {
             links++;

@@ -14,3 +14,10 @@ updates:
     schedule:
       interval: weekly
     labels: [dependencies, build]
+
+  # The site's build: markdown rendering and highlighting, run at build time only.
+  - package-ecosystem: npm
+    directory: /tools/site
+    schedule:
+      interval: weekly
+    labels: [dependencies, build]

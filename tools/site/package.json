@@ -1,0 +1,16 @@
+{
+  "name": "java-concurrency-interview-site",
+  "private": true,
+  "type": "module",
+  "description": "Builds the web version from questions/: renders the markdown once, and writes the interactive page, a page per question and a sitemap.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "highlight.js": "11.11.1",
+    "marked": "15.0.12"
+  }
+}
