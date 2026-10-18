@@ -1,6 +1,6 @@
 // Builds the web version into _site/ (or the directory given as the first argument).
 //
-//   cd tools/site && npm ci && node build.mjs
+//   cd tools/site && npm ci && node build.mjs        (Node 20 or newer)
 //   python3 -m http.server -d ../../_site 8000
 //
 // 1. Exports questions/ to JSON with the quiz's own parser, so the site reads the same files the
