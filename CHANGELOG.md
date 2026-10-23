@@ -3,6 +3,16 @@
 Each release is a tag and a GitHub release with the runnable jar attached. The release notes are the
 section below whose heading matches the tag, so add one before tagging.
 
+## Unreleased
+
+- The site meets WCAG AA contrast in both themes: a darker orange in light mode, dark text on orange
+  buttons in dark mode, and darker keyword colours in highlighted code. Lighthouse accessibility is
+  100 on the front page, a question page and the quiz.
+- The browser quiz can be answered from the keyboard: letters or digits pick an option, Enter checks
+  and moves on, S skips.
+- Search matches every word in any order, so "pool size" finds "How do you size a thread pool?".
+- A missing page offers to search for the words in its address instead of GitHub's bare 404.
+
 ## 1.1.0
 
 180 questions, up from 173, and a web version.

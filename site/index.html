@@ -91,11 +91,12 @@
   };
 
   function visible() {
-    const q = state.query.toLowerCase();
+    // Every word has to appear somewhere, in any order: "pool size" finds "how do you size a thread pool".
+    const words = state.query.toLowerCase().split(/\s+/).filter(Boolean);
     return state.all.filter(x =>
       (!state.level || x.level === state.level) &&
       (!state.topic || x.topic.id === state.topic) &&
-      (!q || x.search.includes(q)));
+      words.every(w => x.search.includes(w)));
   }
 
   function renderRead() {
@@ -185,8 +186,8 @@
     list.className = 'opts';
     order.forEach((i, pos) => {
       const li = document.createElement('li');
-      li.innerHTML = '<label class="opt"><input type="' + (multi ? 'checkbox' : 'radio') + '" name="opt" value="' + i + '"> <span>' +
-        x.options[i].html + '</span></label>';
+      li.innerHTML = '<label class="opt"><input type="' + (multi ? 'checkbox' : 'radio') + '" name="opt" value="' + i + '">' +
+        '<kbd class="key">' + String.fromCharCode(97 + pos) + '</kbd><span>' + x.options[i].html + '</span></label>';
       list.append(li);
     });
     card.append(list);
@@ -201,6 +202,11 @@
     verdict.className = 'verdict';
     actions.append(check, skip, verdict);
     card.append(actions);
+    const hint = document.createElement('p');
+    hint.className = 'keys-hint';
+    hint.innerHTML = 'Keyboard: <kbd>a</kbd>-<kbd>' + String.fromCharCode(96 + order.length) + '</kbd> to choose, ' +
+      '<kbd>Enter</kbd> to check and again for the next question, <kbd>s</kbd> to skip.';
+    card.append(hint);
 
     check.addEventListener('click', () => {
       const chosen = [...list.querySelectorAll('input:checked')].map(el => Number(el.value));
@@ -231,7 +237,29 @@
     });
     skip.addEventListener('click', () => { state.quiz = nextQuestion(); renderQuiz(); window.scrollTo({ top: 0 }); });
     main.append(card);
+    state.keys = { list, check, skip };
   }
+
+  // The terminal quiz is answered with letters; so is this one. Typing in the search box is left alone.
+  document.addEventListener('keydown', (e) => {
+    if (state.mode !== 'quiz' || !state.keys || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target.matches('input[type=search], select, textarea')) return;
+    const { list, check, skip } = state.keys;
+    const inputs = [...list.querySelectorAll('input')];
+    const key = e.key.toLowerCase();
+    const pos = /^[a-h]$/.test(key) ? key.charCodeAt(0) - 97 : /^[1-8]$/.test(key) ? Number(key) - 1 : -1;
+    if (pos >= 0 && pos < inputs.length && !inputs[pos].disabled) {
+      inputs[pos].click();
+      inputs[pos].focus();
+      e.preventDefault();
+    } else if (key === 'enter' && e.target.tagName !== 'BUTTON') {
+      (check.isConnected ? check : skip).click();
+      e.preventDefault();
+    } else if (key === 's' && check.isConnected) {
+      skip.click();
+      e.preventDefault();
+    }
+  });
 
   function render() { state.mode === 'quiz' ? renderQuiz() : renderRead(); }
 
@@ -285,6 +313,7 @@
     if (!location.hash) state.mode = mode === 'quiz' || mode === 'read' ? mode : store.get('mode', 'read');
     if (state.topics.some(t => t.id === params.get('topic'))) { state.topic = params.get('topic'); $('#topic').value = state.topic; }
     if (['junior', 'mid', 'senior'].includes(params.get('level'))) state.level = params.get('level');
+    if (params.get('search')) { state.query = params.get('search').trim(); $('#search').value = state.query; }
     press(null, 'mode', state.mode);
     press(null, 'level', state.level);
     render();
