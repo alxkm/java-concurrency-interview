@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Not found | Java Concurrency Interview</title>
+<meta name="robots" content="noindex">
+<!-- GitHub Pages serves this for any missing path, at any depth, so every link here is absolute. -->
+<link rel="stylesheet" href="/java-concurrency-interview/style.css">
+</head>
+<body>
+<header class="site-bar"><div class="wrap"><a class="home" href="/java-concurrency-interview/">Java Concurrency <span>Interview</span></a></div></header>
+<main class="wrap article">
+  <h1>That page is not here</h1>
+  <p>The question may have been renamed or merged into another one.</p>
+  <p class="actions">
+    <a class="btn" id="search" href="/java-concurrency-interview/">Search the questions</a>
+    <a href="/java-concurrency-interview/">All questions</a>
+  </p>
+</main>
+<script>
+  // A missing /q/volatile-array/ most likely means a renamed question, so search for its words.
+  const words = location.pathname.split('/').filter(Boolean).pop() || '';
+  if (/^[a-z0-9-]+$/.test(words) && words !== 'java-concurrency-interview') {
+    const query = words.replace(/-/g, ' ');
+    const link = document.getElementById('search');
+    link.href = '/java-concurrency-interview/?search=' + encodeURIComponent(query);
+    link.textContent = 'Search for "' + query + '"';
+  }
+</script>
+</body>
+</html>

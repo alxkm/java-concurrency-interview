@@ -1,6 +1,7 @@
 :root {
   --bg: #ffffff; --surface: #f6f8fa; --border: #d0d7de; --text: #1f2328; --muted: #59636e;
-  --accent: #d1600f; --accent-soft: #fff1e5; --link: #0969da;
+  /* Every text colour here reaches 4.5:1 against the background it sits on (WCAG AA). */
+  --accent: #b54708; --on-accent: #ffffff; --accent-soft: #fff1e5; --link: #0969da;
   --ok: #1a7f37; --ok-soft: #dafbe1; --bad: #cf222e; --bad-soft: #ffebe9;
   --junior: #1a7f37; --mid: #9a6700; --senior: #8250df;
   --code-bg: #f6f8fa;
@@ -8,7 +9,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #e6edf3; --muted: #9198a1;
-    --accent: #f0883e; --accent-soft: #2b1c10; --link: #58a6ff;
+    --accent: #f0883e; --on-accent: #0d1117; --accent-soft: #2b1c10; --link: #58a6ff;
     --ok: #3fb950; --ok-soft: #12261a; --bad: #f85149; --bad-soft: #2d1416;
     --junior: #3fb950; --mid: #d29922; --senior: #bc8cff;
     --code-bg: #161b22;
@@ -86,7 +87,7 @@ details.q > summary::-webkit-details-marker { display: none; }
 .hint { color: var(--muted); font-size: 14px; margin: -6px 0 12px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .btn { font: inherit; font-weight: 600; border-radius: 8px; padding: 8px 16px; cursor: pointer;
-       border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+       border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); }
 .btn.ghost { background: transparent; color: var(--accent); }
 .btn:disabled { opacity: .5; cursor: default; }
 .verdict { font-weight: 700; }
@@ -119,3 +120,20 @@ footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 14
 .pager small { display: block; color: var(--muted); }
 @media (max-width: 600px) { .pager { grid-template-columns: 1fr; } }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* highlight.js's GitHub light theme puts keywords, built-ins and tag names below 4.5:1 on the code
+   background; these are the darker shades GitHub itself uses now. */
+@media (prefers-color-scheme: light) {
+  .hljs-doctag, .hljs-keyword, .hljs-template-tag, .hljs-template-variable, .hljs-type,
+  .hljs-variable.language_ { color: #cf222e; }
+  .hljs-built_in, .hljs-symbol { color: #953800; }
+  .hljs-name, .hljs-quote, .hljs-selector-tag, .hljs-selector-pseudo { color: #116329; }
+}
+
+/* Option letters and the keyboard hint in the quiz. */
+.opt .key { font: 600 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--muted);
+            border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; margin-top: 2px; }
+.keys-hint { color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+.keys-hint kbd { font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; border: 1px solid var(--border);
+                 border-radius: 4px; padding: 0 4px; background: var(--surface); }
+@media (hover: none) { .keys-hint { display: none; } }
