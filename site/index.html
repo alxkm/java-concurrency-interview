@@ -70,7 +70,7 @@
 
 <script>
 (() => {
-  const state = { mode: 'read', level: '', topic: '', query: '', topics: [], all: [], quiz: null };
+  const state = { mode: 'read', level: '', topic: '', query: '', topics: [], all: [], byId: new Map(), quiz: null };
   const $ = (sel) => document.querySelector(sel);
   const main = $('#main');
 
@@ -145,6 +145,14 @@
       link.className = 'permalink'; link.href = 'q/' + x.id + '/'; link.textContent = 'page for this question';
       tags.append(link);
       body.append(tags);
+      const related = (x.related || []).map(id => state.byId.get(id)).filter(Boolean);
+      if (related.length) {
+        const box = document.createElement('div');
+        box.className = 'related';
+        box.innerHTML = '<h3>Related questions</h3><ul>' + related.map(r =>
+          '<li><a href="#' + r.id + '">' + r.promptHtml + '</a> <span class="level ' + r.level + '">' + r.level + '</span></li>').join('') + '</ul>';
+        body.append(box);
+      }
       d.append(body);
     });
     return d;
@@ -304,6 +312,7 @@
         q.number = ++n;
         q.search = (q.prompt + ' ' + q.answer + ' ' + q.tags.join(' ')).toLowerCase();
         state.all.push(q);
+        state.byId.set(q.id, q);
       }
     }
     // ?mode=quiz&topic=04-locks-and-conditions&level=senior, which the static pages link to;
