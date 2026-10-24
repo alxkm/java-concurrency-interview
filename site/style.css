@@ -137,3 +137,11 @@ footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 14
 .keys-hint kbd { font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; border: 1px solid var(--border);
                  border-radius: 4px; padding: 0 4px; background: var(--surface); }
 @media (hover: none) { .keys-hint { display: none; } }
+
+/* Related questions, on a question page and inside an opened card. */
+.related { margin-top: 22px; }
+.related h2, .related h3 { font-size: 17px; margin: 0 0 6px; }
+.related ul { margin: 0; padding-left: 1.2em; }
+.related li { margin: 4px 0; }
+.related a { color: var(--text); }
+.related a:hover { color: var(--link); }

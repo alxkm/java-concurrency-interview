@@ -12,6 +12,10 @@ section below whose heading matches the tag, so add one before tagging.
   and moves on, S skips.
 - Search matches every word in any order, so "pool size" finds "How do you size a thread pool?".
 - A missing page offers to search for the words in its address instead of GitHub's bare 404.
+- Every question links to up to four related ones, chosen by the tags they share, with rare tags
+  weighing more than common ones. They show on the question pages and in an opened card.
+- The site build checks its own output and fails on a broken internal link, text escaped twice, or a
+  question page without a title, heading or description.
 
 ## 1.1.0
 
