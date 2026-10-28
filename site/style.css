@@ -145,3 +145,33 @@ footer { border-top: 1px solid var(--border); color: var(--muted); font-size: 14
 .related li { margin: 4px 0; }
 .related a { color: var(--text); }
 .related a:hover { color: var(--link); }
+
+/* Progress: the browser's copy of the terminal quiz's progress screen, and the marks it puts on cards. */
+.mark { font-size: 12px; font-weight: 600; white-space: nowrap; border: 1px solid currentColor; border-radius: 999px;
+        padding: 0 7px; }
+.mark.learned { color: var(--ok); } .mark.missed { color: var(--bad); }
+.progress { padding-top: 8px; }
+.progress h2 { font-size: 20px; margin: 0 0 8px; }
+.totals { display: grid; gap: 6px; margin: 0 0 8px; }
+.totals div { display: flex; align-items: center; gap: 12px; }
+.totals dt { font-weight: 600; width: 5.5em; }
+.totals dd { margin: 0; font-variant-numeric: tabular-nums; }
+.bar { display: inline-block; vertical-align: middle; width: min(240px, 40vw); height: 10px; margin-right: 10px;
+       border: 1px solid var(--border); border-radius: 999px; background: var(--surface); overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--ok); }
+.bar.seen > span { background: var(--accent); }
+.progress .note { color: var(--muted); font-size: 14px; margin: 0 0 18px; }
+.by-topic { width: 100%; border-collapse: collapse; margin: 0 0 28px; }
+.by-topic th, .by-topic td { text-align: left; font-weight: normal; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.by-topic thead th { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.by-topic th + th, .by-topic td { padding-left: 16px; }
+.by-topic td { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.by-topic td .bar { width: min(160px, 22vw); }
+.by-topic a { color: var(--text); text-decoration: none; }
+.by-topic a:hover { color: var(--link); text-decoration: underline; }
+.misses { padding-left: 1.2em; margin: 0 0 20px; }
+.misses li { margin: 6px 0; }
+.misses a { color: var(--text); }
+.misses a:hover { color: var(--link); }
+.misses .times { color: var(--bad); font-size: 13px; white-space: nowrap; }
+.progress .empty .btn { margin-top: 4px; }
