@@ -16,6 +16,9 @@ section below whose heading matches the tag, so add one before tagging.
   weighing more than common ones. They show on the question pages and in an opened card.
 - The site build checks its own output and fails on a broken internal link, text escaped twice, or a
   question page without a title, heading or description.
+- The site has a Progress view, like the terminal quiz's progress screen: seen and learned overall,
+  learned by topic with a link to quiz that topic, the misses still to learn, and a reset. Cards in
+  the list are marked learned or missed.
 
 ## 1.1.0
 

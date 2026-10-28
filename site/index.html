@@ -40,6 +40,7 @@
       <div class="seg" role="group" aria-label="Mode">
         <button type="button" data-mode="read" aria-pressed="true">Read</button>
         <button type="button" data-mode="quiz" aria-pressed="false">Quiz</button>
+        <button type="button" data-mode="progress" aria-pressed="false">Progress</button>
       </div>
       <input type="search" id="search" placeholder="Search questions and answers" aria-label="Search">
     </div>
@@ -99,7 +100,15 @@
       words.every(w => x.search.includes(w)));
   }
 
+  // Progress is kept per question as { right, wrong, streak }, the same three numbers as the terminal
+  // quiz's progress file. Learned means two right in a row; missed means wrong at least once since.
+  const learned = (p) => p?.streak >= 2;
+  const missed = (p) => p?.wrong > 0 && !learned(p);
+  const mark = (p) => learned(p) ? '<span class="mark learned">learned</span>'
+    : missed(p) ? '<span class="mark missed">missed</span>' : '';
+
   function renderRead() {
+    const progress = store.get('progress', {});
     const shown = new Set(visible().map(x => x.id));
     $('#count').textContent = shown.size + ' of ' + state.all.length;
     main.replaceChildren();
@@ -117,17 +126,17 @@
         pre.textContent = topic.diagram;
         section.append(pre);
       }
-      for (const x of qs) section.append(questionCard(x));
+      for (const x of qs) section.append(questionCard(x, progress[x.id]));
       main.append(section);
     }
   }
 
-  function questionCard(x) {
+  function questionCard(x, p) {
     const d = document.createElement('details');
     d.className = 'q';
     d.id = x.id;
     d.innerHTML = '<summary><span class="num">' + x.number + '.</span><span class="prompt">' + x.promptHtml +
-      '</span><span class="level ' + x.level + '">' + x.level + '</span></summary>';
+      '</span>' + mark(p) + '<span class="level ' + x.level + '">' + x.level + '</span></summary>';
     d.addEventListener('toggle', () => {
       if (!d.open || d.querySelector('.body')) return;
       const body = document.createElement('div');
@@ -168,7 +177,7 @@
     const progress = store.get('progress', {});
     const pool = visible();
     if (!pool.length) return null;
-    const weight = (x) => { const p = progress[x.id]; return !p ? 2 : (p.streak >= 2 ? 0 : 1 + p.wrong * 3); };
+    const weight = (x) => { const p = progress[x.id]; return !p ? 2 : (learned(p) ? 0 : 1 + p.wrong * 3); };
     const top = Math.max(...pool.map(weight));
     const candidates = pool.filter(x => weight(x) === top && x.id !== state.quiz?.question.id);
     const pick = (candidates.length ? candidates : pool)[Math.floor(Math.random() * (candidates.length || pool.length))];
@@ -177,8 +186,7 @@
 
   function renderQuiz() {
     const progress = store.get('progress', {});
-    const learned = state.all.filter(x => progress[x.id]?.streak >= 2).length;
-    $('#count').textContent = learned + ' of ' + state.all.length + ' learned';
+    $('#count').textContent = state.all.filter(x => learned(progress[x.id])).length + ' of ' + state.all.length + ' learned';
     if (!state.quiz || !visible().some(x => x.id === state.quiz.question.id)) state.quiz = nextQuestion();
     main.replaceChildren();
     if (!state.quiz) { main.innerHTML = '<p class="empty">No questions match these filters.</p>'; return; }
@@ -241,7 +249,7 @@
       explain.className = 'explain';
       explain.append(md(x.answerHtml));
       card.append(explain);
-      $('#count').textContent = state.all.filter(q => all[q.id]?.streak >= 2).length + ' of ' + state.all.length + ' learned';
+      $('#count').textContent = state.all.filter(q => learned(all[q.id])).length + ' of ' + state.all.length + ' learned';
     });
     skip.addEventListener('click', () => { state.quiz = nextQuestion(); renderQuiz(); window.scrollTo({ top: 0 }); });
     main.append(card);
@@ -269,15 +277,87 @@
     }
   });
 
-  function render() { state.mode === 'quiz' ? renderQuiz() : renderRead(); }
+  // The terminal quiz's progress screen, for the answers given in this browser: seen and learned overall,
+  // learned by topic, and the misses still to learn. The filters narrow it the same way they narrow the list.
+  function renderProgress() {
+    const progress = store.get('progress', {});
+    const pool = visible();
+    const shown = new Set(pool.map(x => x.id));
+    const count = (qs, test) => qs.filter(x => test(progress[x.id])).length;
+    const bar = (kind, n, total) => '<span class="bar ' + kind + '" aria-hidden="true"><span style="width:' +
+      Math.round(100 * n / total) + '%"></span></span>' + n + ' of ' + total;
+    $('#count').textContent = count(pool, learned) + ' of ' + pool.length + ' learned';
+    main.replaceChildren();
+    if (!pool.length) { main.innerHTML = '<p class="empty">No questions match these filters.</p>'; return; }
+
+    const section = document.createElement('section');
+    section.className = 'progress';
+    if (!count(pool, p => !!p)) {
+      section.innerHTML = '<div class="empty"><p>Nothing answered in this browser yet. Quiz answers are counted here, ' +
+        'by the same rule as the terminal quiz.</p><button type="button" class="btn" data-go="quiz">Start the quiz</button></div>';
+    } else {
+      const misses = pool.filter(x => missed(progress[x.id])).sort((a, b) => progress[b.id].wrong - progress[a.id].wrong);
+      const level = state.level ? '&amp;level=' + state.level : '';
+      section.innerHTML =
+        '<dl class="totals"><div><dt>Seen</dt><dd>' + bar('seen', count(pool, p => !!p), pool.length) + '</dd></div>' +
+        '<div><dt>Learned</dt><dd>' + bar('learned', count(pool, learned), pool.length) + '</dd></div></dl>' +
+        '<p class="note">Learned means right twice in a row, as in the terminal quiz. Progress stays in this browser.</p>' +
+        '<table class="by-topic"><thead><tr><th scope="col">Topic</th><th scope="col">Learned</th></tr></thead><tbody>' +
+        state.topics.map(t => {
+          const qs = t.questions.filter(x => shown.has(x.id));
+          return !qs.length ? '' : '<tr><th scope="row"><a href="?mode=quiz&amp;topic=' + t.id + level + '" data-topic="' + t.id + '">' +
+            esc(t.title) + '</a></th><td>' + bar('learned', count(qs, learned), qs.length) + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        (misses.length ? '<h2>Missed, not learned yet</h2><ul class="misses">' + misses.map(x =>
+          '<li><a href="#' + x.id + '">' + x.promptHtml + '</a> <span class="times">wrong ' + progress[x.id].wrong +
+          (progress[x.id].wrong === 1 ? ' time' : ' times') + '</span></li>').join('') + '</ul>' : '') +
+        '<div class="actions"><button type="button" class="btn" data-go="quiz">' +
+        (misses.length ? 'Quiz the misses first' : 'Continue the quiz') + '</button>' +
+        '<button type="button" class="btn ghost" data-go="reset">Reset progress</button></div>';
+    }
+
+    section.querySelectorAll('[data-topic]').forEach(a => a.addEventListener('click', (e) => {
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;   // a new tab gets there by the href
+      e.preventDefault();
+      state.topic = a.dataset.topic; $('#topic').value = state.topic; state.quiz = null;
+      setMode('quiz');
+      window.scrollTo({ top: 0 });
+    }));
+    // The quiz asks misses before anything unseen, so starting it is the way to retry them.
+    section.querySelectorAll('[data-go=quiz]').forEach(b => b.addEventListener('click', () => {
+      state.quiz = null; setMode('quiz'); window.scrollTo({ top: 0 });
+    }));
+    section.querySelector('[data-go=reset]')?.addEventListener('click', () => {
+      if (!confirm('Forget the answers to all ' + state.all.length + ' questions, not only the ones shown?')) return;
+      store.set('progress', {});
+      state.quiz = null;
+      render();
+    });
+    // A link to the hash already in the address bar fires no hashchange, so open the card by hand.
+    section.querySelectorAll('.misses a').forEach(a => a.addEventListener('click', (e) => {
+      if (location.hash !== a.hash) return;
+      e.preventDefault();
+      setMode('read');
+      openFromHash();
+    }));
+    main.append(section);
+  }
+
+  function render() { ({ read: renderRead, quiz: renderQuiz, progress: renderProgress })[state.mode](); }
 
   function press(group, attr, value) {
     document.querySelectorAll('[data-' + attr + ']').forEach(b => b.setAttribute('aria-pressed', String(b.dataset[attr] === value)));
   }
 
-  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
-    state.mode = b.dataset.mode; press(null, 'mode', state.mode); store.set('mode', state.mode); render();
-  }));
+  // Read and quiz are remembered for the next visit; progress is somewhere you look, not somewhere you stay.
+  function setMode(mode) {
+    state.mode = mode;
+    press(null, 'mode', mode);
+    if (mode !== 'progress') store.set('mode', mode);
+    render();
+  }
+
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
   document.querySelectorAll('[data-level]').forEach(b => b.addEventListener('click', () => {
     state.level = b.dataset.level; press(null, 'level', state.level); state.quiz = null; render();
   }));
@@ -315,11 +395,11 @@
         state.byId.set(q.id, q);
       }
     }
-    // ?mode=quiz&topic=04-locks-and-conditions&level=senior, which the static pages link to;
-    // otherwise the mode used last time.
+    // ?mode=quiz&topic=04-locks-and-conditions&level=senior, which the static pages and the progress
+    // view link to; otherwise read or quiz, whichever was used last time.
     const params = new URLSearchParams(location.search);
     const mode = params.get('mode');
-    if (!location.hash) state.mode = mode === 'quiz' || mode === 'read' ? mode : store.get('mode', 'read');
+    if (!location.hash) state.mode = ['read', 'quiz', 'progress'].includes(mode) ? mode : store.get('mode', 'read') === 'quiz' ? 'quiz' : 'read';
     if (state.topics.some(t => t.id === params.get('topic'))) { state.topic = params.get('topic'); $('#topic').value = state.topic; }
     if (['junior', 'mid', 'senior'].includes(params.get('level'))) state.level = params.get('level');
     if (params.get('search')) { state.query = params.get('search').trim(); $('#search').value = state.query; }
